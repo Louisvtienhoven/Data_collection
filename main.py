@@ -1,5 +1,7 @@
-def main():
-    print("Hello World")
+"""Running config file is necessary to import heat package. Currently, heat package is not installed in the interpreter."""
 
-if __name__ == "__main__":
-    main()
+import config
+import heat as ht
+#print(heat.__file__)  # This will show where Python is importing `heat` from
+
+print(ht.arange(10))
