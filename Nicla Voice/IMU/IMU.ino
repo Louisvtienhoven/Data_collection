@@ -1,6 +1,8 @@
-#include <Arduino_LittleFS.h>
+
 #include "NDP.h"
 #include "BMI270_Init.h"
+#include <LittleFS.h>
+
 
 // Named constants
 #define READ_START_ADDRESS 0x0C
