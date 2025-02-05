@@ -1,1 +1,1 @@
-# Thesis-Digital-Twin
+# MSc Thesis Louis van Tienhoven
