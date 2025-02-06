@@ -1,3 +1,4 @@
+//As the Arduino framework is being used here, not required script is used with Arduino IDE
 #include <Arduino.h>
 
 // ---------- MbedOS / LittleFS Includes ----------
@@ -46,7 +47,7 @@ static const char* LOG_FILENAME = "sensorData.csv";
 // ---------------------------------------------------
 
 // How long to sample, in milliseconds:
-static const unsigned long SAMPLE_DURATION_MS = 5000;
+static const unsigned long SAMPLE_DURATION_MS = 120000;
 
 // After sampling finishes, we'll wait another 5s
 // before reading and printing the file. Change as needed.
@@ -248,6 +249,17 @@ void setup() {
 }
 
 void loop() {
+  // Check for stop command from Serial Monitor
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');  // Read input until newline
+    command.trim();  // Remove any leading/trailing whitespace
+
+    if (command == "Stop" || command == " stop") {
+      Serial.println("Stop command received. Halting execution.");
+      while (true) { /* Halt execution */ }
+    }
+  }
+
   unsigned long elapsed = millis() - startTime;
 
   // 1) For the configured sampling duration, read sensor & write lines
@@ -273,14 +285,23 @@ void loop() {
     float y_gyr = y_gyr_raw * GYRO_SCALE_FACTOR;
     float z_gyr = z_gyr_raw * GYRO_SCALE_FACTOR;
 
-    // Optionally print in real-time (this can slow your loop if you do it every sample)
-    Serial.print("ACC: ");
-    Serial.print(x_acc, 2); Serial.print(", ");
-    Serial.print(y_acc, 2); Serial.print(", ");
-    Serial.print(z_acc, 2); Serial.print(" | GYRO: ");
-    Serial.print(x_gyr, 2); Serial.print(", ");
-    Serial.print(y_gyr, 2); Serial.print(", ");
-    Serial.println(z_gyr, 2);
+    Serial.print("x_acc:");
+    Serial.print(x_acc);
+    Serial.print(",");
+    Serial.print("y_acc:");
+    Serial.print(y_acc);
+    Serial.print(",");
+    Serial.print("z_acc:");
+    Serial.println(z_acc);
+
+    Serial.print("x_gyr:");
+    Serial.print(x_gyr);
+    Serial.print(",");
+    Serial.print("y_gyr:");
+    Serial.print(y_gyr);
+    Serial.print(",");
+    Serial.print("z_gyr:");
+    Serial.println(z_gyr);
 
     // Write data to the *open file*
     writeToFile(x_acc, y_acc, z_acc, x_gyr, y_gyr, z_gyr);
