@@ -163,22 +163,22 @@ void loop() {
   delay(10);
 }
 
-// // Function to print the stored data
-// void printStoredData() {
-//   Serial.println("Time (ms), x_acc, y_acc, z_acc, x_gyr, y_gyr, z_gyr");
-//   for (int i = 0; i < dataIndex; i++) {
-//     Serial.print(i * 10);  // Time in milliseconds (10ms intervals)
-//     Serial.print(",");
-//     Serial.print(dataBuffer[i].x_acc);
-//     Serial.print(",");
-//     Serial.print(dataBuffer[i].y_acc);
-//     Serial.print(",");
-//     Serial.print(dataBuffer[i].z_acc);
-//     Serial.print(",");
-//     Serial.print(dataBuffer[i].x_gyr);
-//     Serial.print(",");
-//     Serial.print(dataBuffer[i].y_gyr);
-//     Serial.print(",");
-//     Serial.println(dataBuffer[i].z_gyr);
-//   }
+// Function to print the stored data
+void printStoredData() {
+  Serial.println("Time (ms), x_acc, y_acc, z_acc, x_gyr, y_gyr, z_gyr");
+  for (int i = 0; i < dataIndex; i++) {
+    Serial.print(i * 10);  // Time in milliseconds (10ms intervals)
+    Serial.print(",");
+    Serial.print(dataBuffer[i].x_acc);
+    Serial.print(",");
+    Serial.print(dataBuffer[i].y_acc);
+    Serial.print(",");
+    Serial.print(dataBuffer[i].z_acc);
+    Serial.print(",");
+    Serial.print(dataBuffer[i].x_gyr);
+    Serial.print(",");
+    Serial.print(dataBuffer[i].y_gyr);
+    Serial.print(",");
+    Serial.println(dataBuffer[i].z_gyr);
+  }
 }

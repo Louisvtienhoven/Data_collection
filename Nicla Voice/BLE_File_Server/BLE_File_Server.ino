@@ -5,82 +5,88 @@
 constexpr auto userRoot{"fs"};
 mbed::LittleFileSystem fs{userRoot};
 
-// BLE Service and Characteristics
-BLEService csvService("12345678-1234-5678-1234-56789abcdef0");  // Custom UUID
-BLECharacteristic fileDataChar("abcdef01-1234-5678-1234-56789abcdef0", 
-                              BLENotify, 128); // Sends file data
-BLECharacteristic controlChar("abcdef02-1234-5678-1234-56789abcdef0",
-                              BLEWrite, 1); // Client requests next chunk
+// BLE Service & Characteristics
+BLEService csvService("12345678-1234-5678-1234-56789abcdef0");
+BLECharacteristic fileDataChar("abcdef01-1234-5678-1234-56789abcdef0", BLENotify, 244);  // Max BLE 5.0 packet size
+BLECharacteristic controlChar("abcdef02-1234-5678-1234-56789abcdef1", BLEWrite, 1);
 
 const char* filename = "sensorData.csv";
 mbed::File logFile;
 bool fileOpen = false;
-size_t fileSize = 0;
+bool transferInProgress = false;
 size_t bytesSent = 0;
-const size_t CHUNK_SIZE = 128;
+const size_t CHUNK_SIZE = 244;  // BLE 5.0 allows up to 244 bytes per packet
 char buffer[CHUNK_SIZE];
 
-// Function to send next file chunk
+// Function to send next data chunk
 void sendNextChunk() {
-  if (!fileOpen) return;
+  if (!fileOpen || !transferInProgress) return;
 
   ssize_t bytesRead = logFile.read(buffer, CHUNK_SIZE);
   if (bytesRead > 0) {
     fileDataChar.writeValue((const void*)buffer, (int)bytesRead);
     bytesSent += bytesRead;
   } else {
+    // End of file marker
+    const char eofMarker[] = "<EOF>";
+    fileDataChar.writeValue((const void*)eofMarker, sizeof(eofMarker));
+
     Serial.println("File transfer complete.");
     logFile.close();
     fileOpen = false;
+    transferInProgress = false;
     bytesSent = 0;
   }
 }
 
 void setup() {
   Serial.begin(115200);
-  delay(3000);
-  Serial.println("\n--- Nicla Voice BLE CSV Transfer ---");
+  delay(3000);  // Allow serial monitor setup
+
+  Serial.println("\n--- BLE 5.0 CSV File Transfer ---");
 
   // Initialize BLE
   if (!BLE.begin()) {
-    Serial.println("Starting BLE failed!");
+    Serial.println("BLE failed to start!");
     while (1);
   }
+  Serial.println("BLE Initialized!");
 
-  // Set device name and advertise service
+  // Set BLE parameters
   BLE.setLocalName("NiclaVoice_CSV");
   BLE.setAdvertisedService(csvService);
+  BLE.setConnectionInterval(7.5, 15);  // Minimize latency
 
-  // Add characteristics to service
   csvService.addCharacteristic(fileDataChar);
   csvService.addCharacteristic(controlChar);
   BLE.addService(csvService);
 
-  // Start advertising
+  Serial.println("Starting BLE advertising...");
   BLE.advertise();
-  Serial.println("BLE advertising started.");
 
-  // Event handler for controlChar
+  // Event handler for file transfer start
   controlChar.setEventHandler(BLEWritten, [](BLEDevice central, BLECharacteristic characteristic) {
     uint8_t command;
     characteristic.readValue(command);
-    if (command == 1 && !fileOpen) {
-      // Open the file
-      int err = logFile.open(&fs, filename, O_RDONLY);
-      if (err) {
-        Serial.println("Cannot open file!");
-        return;
-      }
-      fileSize = logFile.size();
-      fileOpen = true;
-      bytesSent = 0;
-      Serial.println("File opened, starting transfer...");
-    }
-    sendNextChunk();
-  });
+    if (command == 1 && !transferInProgress) {
+      Serial.println("Received start transfer command.");
 
-  Serial.println("Setup complete. Waiting for BLE connection.");
+      if (!fileOpen) {
+        int err = logFile.open(&fs, filename, O_RDONLY);
+        if (err) {
+          Serial.println("Cannot open file!");
+          return;
+        }
+        fileOpen = true;
+        transferInProgress = true;
+        bytesSent = 0;
+        Serial.println("File opened, starting transfer...");
+      }
+      sendNextChunk();
+    }
+  });
 }
+
 
 void loop() {
   BLEDevice central = BLE.central();
@@ -90,13 +96,13 @@ void loop() {
     Serial.println(central.address());
 
     while (central.connected()) {
-      if (fileOpen) {
-        sendNextChunk();
-        delay(50);  // Avoid overloading BLE with rapid packets
-      }
+      sendNextChunk();
+      delay(5);  // Small delay for BLE stack processing
     }
 
-    Serial.println("Client disconnected. Resetting.");
+    Serial.println("Client disconnected. Resetting...");
     fileOpen = false;
+    transferInProgress = false;
+    BLE.advertise();
   }
 }
