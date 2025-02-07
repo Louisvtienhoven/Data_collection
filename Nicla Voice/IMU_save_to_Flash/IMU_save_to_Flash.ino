@@ -1,3 +1,6 @@
+//Code is based on https://github.com/arduino/nicla-sense-me-fw/blob/main/Arduino_BHY2/examples/StandaloneFlashStorage/StandaloneFlashStorage.ino and code provided by Arduino https://docs.arduino.cc/tutorials/nicla-voice/user-manual/
+
+
 //As the Arduino framework is being used here, not required script is used with Arduino IDE
 #include <Arduino.h>
 
