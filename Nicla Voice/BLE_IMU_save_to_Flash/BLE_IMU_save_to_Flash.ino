@@ -1,4 +1,4 @@
-// Only required if not used within the Arduino IDE
+// Only required if not used within the Arduino IDE 
 #include <Arduino.h>
 #include <TimeLib.h>         // Provides setTime(), year(), etc.
 #include <ArduinoBLE.h>      // Arduino BLE library
@@ -43,7 +43,7 @@ mbed::LittleFileSystem fs{userRoot};
 static const char* LOG_FILENAME = "sensorData.csv";
 
 // ---------------------------------------------------
-// Global measurement parameters (set via BLE)
+// Global measurement parameters (set via BLE or Serial)
 // ---------------------------------------------------
 float measurementDurationMin = 0.2;         // in minutes (default: 0.2 = 12 sec)
 unsigned int measurementFrequencyHz = 100;  // default frequency
@@ -55,7 +55,7 @@ unsigned long measurementDurationMS = 0;
 unsigned long sampleDelayMS = 0;
 
 // Flags for measurement state
-volatile bool measurementInitiated = false;  // set via BLE when new parameters are received
+volatile bool measurementInitiated = false;  // set via BLE/Serial when new parameters are received
 volatile bool measurementInProgress = false; // true during an ongoing measurement session
 
 // ---------------------------------------------------
@@ -70,18 +70,18 @@ unsigned long startTime = 0;
 BLEService measurementService("12345678-1234-5678-1234-56789abcdef0");  // Arbitrary UUID
 BLECharacteristic measurementChar("abcdef01-1234-5678-1234-56789abcdef0", BLEWrite, 64);
 
-// BLE event handler: called when a central writes to measurementChar
+// ---------------------------------------------------
+// Function: Parse measurement parameters from a command string.
 // Expected format: "frequency,realWorldTime,duration,remove"
 // Example: "200,1708531300,0.5,0" means 200Hz, Unix time=1708531300, 0.5 minutes, do not remove old file.
-void onMeasurementWritten(BLEDevice central, BLECharacteristic characteristic) {
+void parseMeasurementCommand(String value) {
   // If a measurement is already in progress, ignore new commands.
   if (measurementInProgress) {
     Serial.println("Measurement already in progress. Ignoring new command.");
     return;
   }
   
-  String value = String((const char*)characteristic.value());
-  Serial.print("Received measurement parameters via BLE: ");
+  Serial.print("Received measurement parameters: ");
   Serial.println(value);
 
   int firstComma = value.indexOf(',');
@@ -112,6 +112,15 @@ void onMeasurementWritten(BLEDevice central, BLECharacteristic characteristic) {
   else {
     Serial.println("Invalid parameter format received.");
   }
+}
+
+// ---------------------------------------------------
+// BLE event handler: called when a central writes to measurementChar
+// ---------------------------------------------------
+void onMeasurementWritten(BLEDevice central, BLECharacteristic characteristic) {
+  // Use the common parser function.
+  String value = String((const char*)characteristic.value());
+  parseMeasurementCommand(value);
 }
 
 // ---------------------------------------------------
@@ -277,7 +286,7 @@ void executeMeasurementSession() {
 void setup() {
   Serial.begin(115200);
   delay(3000);
-  Serial.println("\n--- Nicla Voice: BLE-Initiated Measurement Demo ---");
+  Serial.println("\n--- Nicla Voice: BLE/Serial-Initiated Measurement Demo ---");
 
   // --- Initialize BLE ---
   BLE.setLocalName("NiclaVoice");
@@ -369,7 +378,7 @@ void setup() {
     CHECK_STATUS(status);
   }
   
-  Serial.println("Setup complete. Waiting for BLE measurement commands...");
+  Serial.println("Setup complete. Waiting for BLE/Serial measurement commands...");
 }
 
 void loop() {
@@ -383,7 +392,7 @@ void loop() {
     executeMeasurementSession();
   }
 
-  // Check for Serial commands to retrieve CSV or stop execution (only when not measuring)
+  // Check for Serial commands when not measuring:
   if (!measurementInProgress && Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
     command.trim();
@@ -395,6 +404,14 @@ void loop() {
     else if (command.equalsIgnoreCase("STOP")) {
       Serial.println("Stop command received. Halting execution.");
       while (true) {}
+    }
+    // If the command contains commas, treat it as measurement parameters.
+    else if (command.indexOf(',') != -1) {
+      parseMeasurementCommand(command);
+    }
+    else {
+      Serial.print("Unrecognized command: ");
+      Serial.println(command);
     }
   }
 }
