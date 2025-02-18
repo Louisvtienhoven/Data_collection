@@ -5,9 +5,9 @@ import pytz  # for timezone conversion
 from bleak import BleakClient, BleakScanner
 
 # Measurement parameters
-frequency = 60      # Hz
+frequency = 65      # Hz
 duration = 0.05     # in minutes
-remove_flag = 0     # 0 = false, 1 = true
+remove_flag = 1     # 0 = false, 1 = true
 
 # BLE Variables
 n_retries = 10

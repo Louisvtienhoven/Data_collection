@@ -1,31 +1,49 @@
-import time
 import serial
+import time
 from datetime import datetime
-import pytz
+import pytz  # for timezone conversion
 
 # Measurement parameters
-frequency = 60      # Hz
-duration = 0.05     # in minutes
-remove_flag = 0     # 0 = false, 1 = true
+frequency = 65  # Hz
+duration = 0.05  # in minutes
+remove_flag = 1  # 0 = false, 1 = true
 
-# Get current Unix timestamp in Europe/Amsterdam timezone
-tz = pytz.timezone("Europe/Amsterdam")
-real_world_time = int(datetime.now(tz).timestamp())
-
-# Format the command string (e.g., "55,1708531300,0.05,0")
-command = f"{frequency},{real_world_time},{duration},{remove_flag}"
-print(f"Measurement command to send: {command}")
-
-# Serial port configuration (update PORT as needed)
-PORT = "COM3"      # e.g., "COM3" on Windows or "/dev/ttyACM0" on Linux/macOS
+# USB Serial configuration (update port name as necessary)
+SERIAL_PORT = "COM3"  # For Windows (e.g., "COM3"); use "/dev/ttyACM0" on Linux/macOS
 BAUD_RATE = 115200
 
-try:
-    with serial.Serial(PORT, BAUD_RATE, timeout=2) as ser:
-        # Wait longer to allow the Arduino to reset and initialize
-        time.sleep(4)
-        ser.flushInput()
-        ser.write((command + "\n").encode('utf-8'))
-        print("Measurement command sent via Serial.")
-except Exception as e:
-    print("Error:", e)
+
+def send_measurement_parameters():
+    try:
+        with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=10) as ser:
+            # Give Arduino time to reset after opening the port
+            time.sleep(2)
+
+            # (Optional) Read any startup messages from Arduino
+            while ser.in_waiting:
+                line = ser.readline().decode().strip()
+                print(line)
+
+            # Get the actual Unix timestamp in the correct timezone (Europe/Amsterdam)
+            tz = pytz.timezone("Europe/Amsterdam")  # Adjust as needed
+            real_world_time = int(datetime.now(tz).timestamp())
+
+            # Format the command string (must match the Arduino format)
+            command = f"{frequency},{real_world_time},{duration},{remove_flag}\n"
+            print(f"Sending command: {command.strip()}")
+
+            # Send the command over USB Serial
+            ser.write(command.encode())
+            ser.flush()
+
+            # (Optional) Read and print Arduino's response for a short time
+            time.sleep(1)
+            while ser.in_waiting:
+                print(ser.readline().decode().strip())
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+if __name__ == "__main__":
+    send_measurement_parameters()
