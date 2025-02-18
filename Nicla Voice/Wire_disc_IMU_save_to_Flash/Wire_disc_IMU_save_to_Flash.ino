@@ -72,6 +72,14 @@ enum MeasurementState {
 MeasurementState currentState = WAITING_FOR_COMMAND;
 
 // ---------------------------------------------------
+// Global variables for LED blinking in battery mode
+// ---------------------------------------------------
+bool batteryMode = false;               // set true if measurement loaded from flash
+unsigned long previousBlinkTime = 0;
+const unsigned long blinkInterval = 500;  // blink every 500ms
+bool ledOn = false;
+
+// ---------------------------------------------------
 // Function: Write one CSV line to the open file
 // ---------------------------------------------------
 void writeToFile(float ax, float ay, float az,
@@ -314,6 +322,8 @@ void setup() {
   
   // 3) Check if a measurement command was previously stored.
   if (loadMeasurementCommand()) {
+    // A stored command indicates we are now on battery power.
+    batteryMode = true;
     if (removeOldFile) {
       fs.remove(LOG_FILENAME);
     }
@@ -399,6 +409,20 @@ void loop() {
   }
   // State: SAMPLING - record sensor data until duration has elapsed
   else if (currentState == SAMPLING) {
+    // If in battery mode, blink the LED green every blinkInterval
+    if (batteryMode) {
+      if (millis() - previousBlinkTime >= blinkInterval) {
+        previousBlinkTime = millis();
+        ledOn = !ledOn;
+        if (ledOn) {
+          // Turn LED green. Adjust parameters if your LED library requires different calls.
+          nicla::leds.setColor(0, 255, 0);
+        } else {
+          nicla::leds.setColor(0, 0, 0);
+        }
+      }
+    }
+  
     unsigned long elapsed = millis() - startTime;
     if (elapsed < g_sampleDurationMs) {
       uint8_t __attribute__((aligned(4))) sensor_data[SENSOR_DATA_LENGTH];

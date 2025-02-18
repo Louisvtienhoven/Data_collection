@@ -3,5 +3,4 @@ S... done.
 - NDP processor initialization done!
 - BMI270 initialization starting...
 - BMI270 Initialization done!
-Waiting for measurement command in the Measurement command stored in flash.
-Invalid command format. Please use: frequency,realWorldTime,duration,remove_flag
+Measurement already completed. Waiting Invalid command format. Please use: frequency,realWorldTime,duration,remove_flag
