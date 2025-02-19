@@ -4,7 +4,7 @@ from datetime import datetime
 import pytz  # for timezone conversion
 
 # Measurement parameters
-frequency = 65  # Hz
+frequency = 75  # Hz
 duration = 0.05  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 

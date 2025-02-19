@@ -1,4 +1,4 @@
-#include <Arduino.h>
+#include <Arduino.h> 
 #include <TimeLib.h>         // Provides setTime(), year(), etc.
 
 // ---------- MbedOS / LittleFS Includes ----------
@@ -50,7 +50,7 @@ static const char* CMD_FILENAME = "command.txt";
 unsigned int sampleFrequencyHz = 100;   // in Hz
 float sampleDurationMin = 0.2;          // in minutes
 unsigned long realWorldTime = 1708531200; // Unix timestamp
-bool removeOldFile = true;
+bool removeOldFile = false;             // Default is NOT to remove the log file
 
 // These will be computed based on the measurement parameters
 unsigned long g_sampleDurationMs = 0;
@@ -175,7 +175,7 @@ void writeMetadataToFile() {
 void storeMeasurementCommand(const String &command) {
   mbed::File file;
   int err = file.open(&fs, CMD_FILENAME, O_WRONLY | O_CREAT | O_TRUNC);
-  if(err) {
+  if (err) {
     Serial.println("Error opening command file for writing.");
     return;
   }
@@ -258,15 +258,31 @@ void setup() {
   }
   err = fs.mount(spif);
   if (err) {
-    Serial.println("Mount failed, trying reformat...");
-    err = fs.reformat(spif);
-    if (err) {
-      Serial.print("Reformat failed: ");
-      Serial.println(err);
-      while (true) {}
-    }
+    Serial.print("Mount failed (error ");
+    Serial.print(err);
+    Serial.println("). Not reformatting to preserve data.");
+    while (true) { delay(1000); }
   }
   Serial.println("done.");
+  
+  // Check if measurement was already completed by looking for the flag file.
+  {
+    mbed::File doneFile;
+    if (doneFile.open(&fs, "done.txt", O_RDONLY) == 0) {
+      Serial.println("Measurement already completed. Skipping new measurement.");
+      doneFile.close();
+      // Open sensorData.csv in append mode so that data is preserved.
+      int flags = O_WRONLY | O_CREAT | O_APPEND;
+      err = logFile.open(&fs, LOG_FILENAME, flags);
+      if (err) {
+        Serial.print("Error opening log file: ");
+        Serial.println(err);
+        while (true) {}
+      }
+      currentState = FINISHED;
+      return; // Exit setup; loop() will handle retrieval commands.
+    }
+  }
   
   // 2) Setup Nicla & BMI270
   nicla::begin();
@@ -324,10 +340,21 @@ void setup() {
   if (loadMeasurementCommand()) {
     // A stored command indicates we are now on battery power.
     batteryMode = true;
+    
+    // If the command explicitly requests removal, remove sensorData.csv.
     if (removeOldFile) {
       fs.remove(LOG_FILENAME);
     }
-    err = logFile.open(&fs, LOG_FILENAME, O_WRONLY | O_CREAT | O_TRUNC);
+    
+    // Choose the file open flags based on removeOldFile.
+    int flags = O_WRONLY | O_CREAT;
+    if (removeOldFile) {
+      flags |= O_TRUNC;  // start with a new file
+    } else {
+      flags |= O_APPEND; // append to the existing file
+    }
+    
+    err = logFile.open(&fs, LOG_FILENAME, flags);
     if (err) {
       Serial.print("Error opening log file: ");
       Serial.println(err);
@@ -350,14 +377,54 @@ void setup() {
 }
 
 // ---------------------------------------------------
-// Loop: Wait for a measurement command, then sample, then respond to queries.
+// Loop: Process commands and perform sampling.
 // ---------------------------------------------------
 void loop() {
-  // State: WAITING_FOR_COMMAND
+  // If waiting for a measurement command, also allow retrieval commands.
   if (currentState == WAITING_FOR_COMMAND) {
     if (Serial.available() > 0) {
       String command = Serial.readStringUntil('\n');
       command.trim();
+
+      // Check for retrieval commands even in WAITING_FOR_COMMAND state.
+      if (command.equalsIgnoreCase("GETCSV")) {
+        Serial.println("Sending CSV file contents:");
+        readAndPrintFile(LOG_FILENAME);
+        Serial.println("=== End of CSV ===");
+        return;
+      }
+      else if (command.equalsIgnoreCase("CLRFLAG")) {
+        // Remove done.txt
+        mbed::File flagCheck;
+        int ret = flagCheck.open(&fs, "done.txt", O_RDONLY);
+        if(ret == 0) {
+          flagCheck.close();
+          int rem = fs.remove("done.txt");
+          if(rem == 0) {
+            Serial.println("done.txt removed.");
+          } else {
+            Serial.print("Error removing done.txt, error code: ");
+            Serial.println(rem);
+          }
+        } else {
+          Serial.println("done.txt does not exist.");
+        }
+        // Also remove sensorData.csv
+        int remCSV = fs.remove(LOG_FILENAME);
+        if(remCSV == 0) {
+          Serial.println("sensorData.csv removed.");
+        } else {
+          Serial.print("Error removing sensorData.csv, error code: ");
+          Serial.println(remCSV);
+        }
+        return;
+      }
+      else if (command.equalsIgnoreCase("STOP")) {
+        Serial.println("Stop command received. Halting execution.");
+        while (true) {}
+      }
+      
+      // Otherwise, process as a measurement command.
       if (command.length() > 0) {
         storeMeasurementCommand(command);
         int firstComma = command.indexOf(',');
@@ -375,7 +442,7 @@ void loop() {
           sampleDurationMin = durStr.toFloat();
           removeOldFile = (removeStr.toInt() != 0);
   
-          // Recalculate delay and duration in milliseconds based on new parameters
+          // Recalculate timing parameters.
           g_sampleDurationMs = (unsigned long)(sampleDurationMin * 60 * 1000);
           g_sampleDelayMs = (sampleFrequencyHz > 0) ? (1000 / sampleFrequencyHz) : 10;
   
@@ -385,11 +452,14 @@ void loop() {
           Serial.print("  Real-world Time: "); Serial.println(realWorldTime);
           Serial.print("  Remove old file: "); Serial.println(removeOldFile ? "Yes" : "No");
   
+          // Choose file open flags.
+          int flags = O_WRONLY | O_CREAT;
           if (removeOldFile) {
-            fs.remove(LOG_FILENAME);
+            flags |= O_TRUNC;  // start fresh
+          } else {
+            flags |= O_APPEND; // append to existing data
           }
-  
-          int err = logFile.open(&fs, LOG_FILENAME, O_WRONLY | O_CREAT | O_TRUNC);
+          int err = logFile.open(&fs, LOG_FILENAME, flags);
           if (err) {
             Serial.print("Error opening log file: ");
             Serial.println(err);
@@ -399,7 +469,7 @@ void loop() {
   
           Serial.println("Measurement command received.");
           Serial.println("Waiting 5 seconds for cable disconnection and power source change...");
-          delay(5000);  // 5-second delay before starting sampling
+          delay(5000);  // delay before sampling starts
           startTime = millis();
           currentState = SAMPLING;
           Serial.println("Sampling started...");
@@ -407,15 +477,13 @@ void loop() {
       }
     }
   }
-  // State: SAMPLING - record sensor data until duration has elapsed
+  // SAMPLING state: record sensor data.
   else if (currentState == SAMPLING) {
-    // If in battery mode, blink the LED green every blinkInterval
     if (batteryMode) {
       if (millis() - previousBlinkTime >= blinkInterval) {
         previousBlinkTime = millis();
         ledOn = !ledOn;
         if (ledOn) {
-          // Turn LED green. Adjust parameters if your LED library requires different calls.
           nicla::leds.setColor(0, 255, 0);
         } else {
           nicla::leds.setColor(0, 0, 0);
@@ -451,10 +519,22 @@ void loop() {
     } else {
       Serial.println("Sampling finished. File closed.");
       logFile.close();
+      
+      // Create flag file to indicate measurement completion.
+      mbed::File flagFile;
+      int err = flagFile.open(&fs, "done.txt", O_WRONLY | O_CREAT | O_TRUNC);
+      if (!err) {
+        flagFile.write("done", 4);
+        flagFile.sync();
+        flagFile.close();
+      } else {
+        Serial.println("Error creating done.txt flag file.");
+      }
+      
       currentState = FINISHED;
     }
   }
-  // State: FINISHED - wait for further serial commands (e.g., GETCSV or STOP)
+  // FINISHED state: process retrieval commands.
   else if (currentState == FINISHED) {
     if (Serial.available() > 0) {
       String cmd = Serial.readStringUntil('\n');
@@ -464,12 +544,37 @@ void loop() {
         readAndPrintFile(LOG_FILENAME);
         Serial.println("=== End of CSV ===");
       }
+      else if (cmd.equalsIgnoreCase("CLRFLAG")) {
+        // Remove done.txt if it exists.
+        mbed::File flagCheck;
+        int ret = flagCheck.open(&fs, "done.txt", O_RDONLY);
+        if(ret == 0) {
+          flagCheck.close();
+          int rem = fs.remove("done.txt");
+          if(rem == 0) {
+            Serial.println("done.txt removed.");
+          } else {
+            Serial.print("Error removing done.txt, error code: ");
+            Serial.println(rem);
+          }
+        } else {
+          Serial.println("done.txt does not exist.");
+        }
+        // Remove sensorData.csv.
+        int remCSV = fs.remove(LOG_FILENAME);
+        if(remCSV == 0) {
+          Serial.println("sensorData.csv removed.");
+        } else {
+          Serial.print("Error removing sensorData.csv, error code: ");
+          Serial.println(remCSV);
+        }
+      }
       else if (cmd.equalsIgnoreCase("STOP")) {
         Serial.println("Stop command received. Halting execution.");
         while (true) {}
       }
       else if (cmd.length() > 0) {
-        Serial.println("Unknown command. Available commands: GETCSV, STOP");
+        Serial.println("Unknown command. Available commands: GETCSV, CLRFLAG, STOP");
       }
     }
   }

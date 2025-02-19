@@ -20,14 +20,22 @@ def retrieve_csv():
 
     # Read all available data.
     csv_data = ser.read_all().decode('utf-8', errors='replace')
+
+    # Now send the CLRFLAG command to clear done.txt.
+    ser.write(b'CLRFLAG\n')
+    time.sleep(0.5)  # Wait for the Arduino to process the command.
+    flag_response = ser.read_all().decode('utf-8', errors='replace')
+
     ser.close()
-    return csv_data
+    return csv_data, flag_response
 
 
 if __name__ == '__main__':
-    csv_content = retrieve_csv()
+    csv_content, flag_resp = retrieve_csv()
     print("Retrieved CSV Data:")
     print(csv_content)
+    print("Flag response:")
+    print(flag_resp)
 
     # Save the CSV data to a local file.
     with open("downloaded.csv", "w", encoding="utf-8") as f:
