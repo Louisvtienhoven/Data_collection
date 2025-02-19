@@ -1,5 +1,47 @@
-//To include the Arduino framework
-#include <Arduino.h> 
+
+/*
+  Explanation:
+  -------------
+  This Arduino code is designed to run on the Nicla Voice board and allows you to initiate sensor measurements via either a wired Serial connection or via Bluetooth Low Energy (BLE).
+
+  Key functionalities include:
+
+  1. Sensor Measurement:
+     - The code reads sensor data from a BMI270 sensor.
+     - The sensor data (accelerometer and gyroscope values) are stored in an SPI flash using LittleFS in CSV format.
+     - A metadata header is written to the CSV file that includes the sampling frequency, duration, and the real-world start time (adjusted for Europe/Amsterdam timezone).
+
+  2. Command Interface:
+     - A measurement command can be sent over Serial (wired) or via BLE.
+     - The expected command format is:
+           frequency,realWorldTime,duration,remove_flag
+       where:
+         - frequency: Sampling frequency in Hz.
+         - realWorldTime: Unix timestamp indicating the desired measurement start time.
+         - duration: Duration of the measurement in minutes.
+         - remove_flag: A flag (1 or 0) indicating whether to clear any existing sensor data.
+     - The command is processed and stored, then used to update measurement parameters before the measurement begins.
+
+  3. BLE Support:
+     - The code initializes BLE and advertises a BLE service.
+     - A writable BLE characteristic is set up so that a central device (e.g., a Python script using Bleak) can send the measurement command wirelessly.
+     - When the BLE characteristic is written, the command is processed just like a Serial command.
+
+  4. Data Retrieval and Reset:
+     - After the measurement is complete, the system enters a FINISHED state.
+     - In this state, Serial commands like GETCSV can be used to send the CSV data over Serial.
+     - The CLRFLAG command (sent via Serial) will delete the flag file and the CSV file (sensorData.csv) from flash, then reset the state to WAITING_FOR_COMMAND so a new measurement can be initiated.
+  
+  5. Dual Interface:
+     - The system supports both BLE and Serial command interfaces simultaneously.
+     - This allows measurements to be initiated either via a BLE connection or through a wired connection, providing flexibility in operation.
+
+  Overall, this code integrates sensor data acquisition, local flash storage, BLE communication, and a Serial command interface within a state machine framework to facilitate easy control and retrieval of sensor data.
+*/
+
+
+
+#include <Arduino.h>
 #include <TimeLib.h>         // Provides setTime(), year(), etc.
 
 // ---------- MbedOS / LittleFS Includes ----------
@@ -7,6 +49,9 @@
 #include <File.h>
 #include <FileSystem.h>
 #include <LittleFileSystem.h>
+
+// ---------- BLE Includes ----------
+#include <ArduinoBLE.h>
 
 // The name of our filesystem root:
 constexpr auto userRoot{"fs"};
@@ -25,9 +70,8 @@ mbed::LittleFileSystem fs{userRoot};
 #define READ_BYTE_COUNT     16
 #define SENSOR_DATA_LENGTH  16
 
-// Accel range = +/- 2g => scale:
+// Accel and Gyro scale factors:
 #define ACCEL_SCALE_FACTOR ((2.0f / 32767.0f) * 9.8f)
-// Gyro range = 2000 dps => scale:
 #define GYRO_SCALE_FACTOR (1.0f / 16.4f)
 
 // Macro to check sensor status
@@ -40,53 +84,50 @@ mbed::LittleFileSystem fs{userRoot};
     }                           \
   } while (0)
 
-// Filenames used for logging and for storing the command
+// Filenames
 static const char* LOG_FILENAME = "sensorData.csv";
 static const char* CMD_FILENAME = "command.txt";
 
-// ---------------------------------------------------
 // Global measurement parameters (default values)
-// These will be updated when a command is received via Serial
-// or loaded from flash.
+// They are updated when a command is received via Serial or BLE.
 unsigned int sampleFrequencyHz = 100;   // in Hz
 float sampleDurationMin = 0.2;          // in minutes
 unsigned long realWorldTime = 1708531200; // Unix timestamp
-bool removeOldFile = false;             // Default is NOT to remove the log file
+bool removeOldFile = false;             // Default: do not remove file
 
-// These will be computed based on the measurement parameters
+// Computed timing parameters:
 unsigned long g_sampleDurationMs = 0;
 unsigned long g_sampleDelayMs = 0;
 
-// ---------------------------------------------------
-// Globals for timing and file usage
-// ---------------------------------------------------
+// Globals for file usage and timing:
 mbed::File logFile;
 unsigned long startTime = 0;
 
-// Define a simple state machine for measurement operation
+// State machine for measurement operation:
 enum MeasurementState {
   WAITING_FOR_COMMAND,
   SAMPLING,
   FINISHED
 };
-
 MeasurementState currentState = WAITING_FOR_COMMAND;
 
-// ---------------------------------------------------
-// Global variables for LED blinking in battery mode
-// ---------------------------------------------------
-bool batteryMode = false;               // set true if measurement loaded from flash
+// LED blinking variables:
+bool batteryMode = false;  // set true if measurement loaded from flash
 unsigned long previousBlinkTime = 0;
-const unsigned long blinkInterval = 500;  // blink every 500ms
+const unsigned long blinkInterval = 500;  // 500ms
 bool ledOn = false;
 
+// ---------- BLE Service and Characteristic ----------
+// The service UUID and characteristic UUID must match your BLE central (e.g. your Python script).
+BLEService measurementService("abcdef00-1234-5678-1234-56789abcdef0");
+BLEStringCharacteristic measurementCharacteristic("abcdef01-1234-5678-1234-56789abcdef0", BLEWrite, 64);
+
 // ---------------------------------------------------
-// Function: Write one CSV line to the open file
+// Function: Write sensor data to file (without timestamp)
 // ---------------------------------------------------
 void writeToFile(float ax, float ay, float az,
                  float gx, float gy, float gz)
 {
-  unsigned long t = millis();
   char lineBuf[128];
   int n = snprintf(lineBuf, sizeof(lineBuf),
                    "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
@@ -103,7 +144,7 @@ void writeToFile(float ax, float ay, float az,
 }
 
 // ---------------------------------------------------
-// Function: Read entire file from flash and print via Serial
+// Function: Read file and print its contents via Serial
 // ---------------------------------------------------
 void readAndPrintFile(const char* filename)
 {
@@ -129,19 +170,16 @@ void readAndPrintFile(const char* filename)
     buf[readBytes] = '\0';
     Serial.print(buf);
   }
-  Serial.println();  // final newline
+  Serial.println(); // final newline
   file.close();
 }
 
 // ---------------------------------------------------
-// Function: Convert Unix timestamp to human-readable format
-// (Adjusted to show one hour later, e.g. Amsterdam time)
+// Function: Convert Unix timestamp to human-readable string
+// (Adjusted to Europe/Amsterdam time)
 // ---------------------------------------------------
 String convertUnixToReadable(unsigned long unixTime) {
-  if (unixTime == 0) {
-    return "Time not set";
-  }
-  // Add one hour (3600 seconds) for Amsterdam time adjustment
+  if (unixTime == 0) return "Time not set";
   setTime(unixTime + 3600);
   char timeStr[25];
   snprintf(timeStr, sizeof(timeStr), "%04d-%02d-%02d %02d:%02d:%02d",
@@ -150,7 +188,7 @@ String convertUnixToReadable(unsigned long unixTime) {
 }
 
 // ---------------------------------------------------
-// Function: Write metadata (frequency, duration, real-world time) to file
+// Function: Write measurement metadata to file
 // ---------------------------------------------------
 void writeMetadataToFile() {
   char metadata[128];
@@ -171,7 +209,7 @@ void writeMetadataToFile() {
 }
 
 // ---------------------------------------------------
-// Store the received measurement command persistently
+// Function: Store measurement command persistently
 // ---------------------------------------------------
 void storeMeasurementCommand(const String &command) {
   mbed::File file;
@@ -187,14 +225,12 @@ void storeMeasurementCommand(const String &command) {
 }
 
 // ---------------------------------------------------
-// Load the measurement command from persistent storage.
-// Returns true if a valid command was loaded.
+// Function: Load measurement command from persistent storage
+// ---------------------------------------------------
 bool loadMeasurementCommand() {
   mbed::File file;
   int err = file.open(&fs, CMD_FILENAME, O_RDONLY);
-  if (err) {
-    return false; // No command stored
-  }
+  if (err) return false;
   char buffer[128] = {0};
   ssize_t n = file.read(buffer, sizeof(buffer)-1);
   file.close();
@@ -203,7 +239,7 @@ bool loadMeasurementCommand() {
   command.trim();
   if (command.length() == 0) return false;
   
-  // Parse the command string: expecting "frequency,realWorldTime,duration,remove_flag"
+  // Expected format: "frequency,realWorldTime,duration,remove_flag"
   int firstComma = command.indexOf(',');
   int secondComma = command.indexOf(',', firstComma + 1);
   int thirdComma = command.indexOf(',', secondComma + 1);
@@ -220,7 +256,6 @@ bool loadMeasurementCommand() {
   sampleDurationMin = durStr.toFloat();
   removeOldFile = (removeStr.toInt() != 0);
   
-  // Compute timing parameters
   g_sampleDurationMs = (unsigned long)(sampleDurationMin * 60 * 1000);
   g_sampleDelayMs = (sampleFrequencyHz > 0) ? (1000 / sampleFrequencyHz) : 10;
   
@@ -228,25 +263,100 @@ bool loadMeasurementCommand() {
   Serial.print("  Frequency (Hz): "); Serial.println(sampleFrequencyHz);
   Serial.print("  Duration (min): "); Serial.println(sampleDurationMin);
   Serial.print("  Real-world Time: "); Serial.println(realWorldTime);
-  Serial.print("Please note that the actual time of the start of the measurement is \
-  somewhat later because of changing the power source and allowing for the PCB to restart");
-  Serial.print("  Remove old file: "); Serial.println(removeOldFile ? "Yes" : "No");
+  Serial.print("Please note that the actual time of the start of the measurement is somewhat later\nbecause of changing the power source and allowing for the PCB to restart");
+  Serial.print("\n  Remove old file: "); Serial.println(removeOldFile ? "Yes" : "No");
   
-  // Remove the stored command so it doesn't restart measurement again unintentionally
   fs.remove(CMD_FILENAME);
-  
   return true;
 }
 
 // ---------------------------------------------------
-// Setup: Initialize SPI Flash, LittleFS, BMI270, and check for stored command.
+// Function: Process measurement command (from Serial or BLE)
+// ---------------------------------------------------
+void processMeasurementCommand(String command) {
+  command.trim();
+  if (command.length() == 0) return;
+  storeMeasurementCommand(command);
+  int firstComma = command.indexOf(',');
+  int secondComma = command.indexOf(',', firstComma + 1);
+  int thirdComma = command.indexOf(',', secondComma + 1);
+  if (firstComma < 0 || secondComma < 0 || thirdComma < 0) {
+    Serial.println("Invalid command format. Please use: frequency,realWorldTime,duration,remove_flag");
+    return;
+  }
+  String freqStr = command.substring(0, firstComma);
+  String timeStr = command.substring(firstComma + 1, secondComma);
+  String durStr  = command.substring(secondComma + 1, thirdComma);
+  String removeStr = command.substring(thirdComma + 1);
+  sampleFrequencyHz = freqStr.toInt();
+  realWorldTime = timeStr.toInt();
+  sampleDurationMin = durStr.toFloat();
+  removeOldFile = (removeStr.toInt() != 0);
+  
+  g_sampleDurationMs = (unsigned long)(sampleDurationMin * 60 * 1000);
+  g_sampleDelayMs = (sampleFrequencyHz > 0) ? (1000 / sampleFrequencyHz) : 10;
+  
+  Serial.println("Measurement parameters updated:");
+  Serial.print("  Frequency (Hz): "); Serial.println(sampleFrequencyHz);
+  Serial.print("  Duration (min): "); Serial.println(sampleDurationMin);
+  Serial.print("  Real-world Time: "); Serial.println(realWorldTime);
+  Serial.print("  Remove old file: "); Serial.println(removeOldFile ? "Yes" : "No");
+  
+  int flags = O_WRONLY | O_CREAT;
+  if (removeOldFile) {
+    flags |= O_TRUNC;
+  } else {
+    flags |= O_APPEND;
+  }
+  int err = logFile.open(&fs, LOG_FILENAME, flags);
+  if (err) {
+    Serial.print("Error opening log file: ");
+    Serial.println(err);
+    return;
+  }
+  writeMetadataToFile();
+  
+  Serial.println("Measurement command received.");
+  Serial.println("Waiting 5 seconds for cable disconnection and power source change...");
+  delay(5000);
+  startTime = millis();
+  currentState = SAMPLING;
+  Serial.println("Sampling started...");
+}
+
+// ---------------------------------------------------
+// BLE Characteristic callback (when a central writes to our characteristic)
+// ---------------------------------------------------
+void measurementCharacteristicWritten(BLEDevice central, BLECharacteristic characteristic) {
+  String command = String((const char*)characteristic.value());
+  Serial.print("BLE command received: ");
+  Serial.println(command);
+  processMeasurementCommand(command);
+}
+
+// ---------------------------------------------------
+// Setup function
 // ---------------------------------------------------
 void setup() {
   Serial.begin(115200);
   delay(3000);
   Serial.println("\n--- Nicla Voice: BMI270 to SPI Flash Demo ---");
   
-  // 1) Initialize SPI Flash & LittleFS
+  // Initialize BLE
+  if (!BLE.begin()) {
+    Serial.println("Starting BLE failed!");
+    while (1);
+  }
+  BLE.setLocalName("NiclaVoice");
+  BLE.setAdvertisedService(measurementService);
+  BLE.setAdvertisingInterval(100); // in milliseconds (adjust as needed)
+  measurementService.addCharacteristic(measurementCharacteristic);
+  BLE.addService(measurementService);
+  measurementCharacteristic.setEventHandler(BLEWritten, measurementCharacteristicWritten);
+  BLE.advertise();
+  Serial.println("BLE device active, waiting for connections...");
+  
+  // Initialize SPI Flash & LittleFS
   Serial.print("Mounting LittleFS... ");
   spif = mbed::BlockDevice::get_default_instance();
   if (!spif) {
@@ -268,13 +378,12 @@ void setup() {
   }
   Serial.println("done.");
   
-  // Check if measurement was already completed by looking for the flag file.
+  // Check if measurement was already completed (flag file exists)
   {
     mbed::File doneFile;
     if (doneFile.open(&fs, "done.txt", O_RDONLY) == 0) {
       Serial.println("Measurement already completed. Skipping new measurement.");
       doneFile.close();
-      // Open sensorData.csv in append mode so that data is preserved.
       int flags = O_WRONLY | O_CREAT | O_APPEND;
       err = logFile.open(&fs, LOG_FILENAME, flags);
       if (err) {
@@ -283,11 +392,11 @@ void setup() {
         while (true) {}
       }
       currentState = FINISHED;
-      return; // Exit setup; loop() will handle retrieval commands.
+      return;
     }
   }
   
-  // 2) Setup Nicla & BMI270
+  // Setup Nicla & BMI270
   nicla::begin();
   nicla::disableLDO();
   nicla::leds.begin();
@@ -339,24 +448,18 @@ void setup() {
     CHECK_STATUS(status);
   }
   
-  // 3) Check if a measurement command was previously stored.
+  // Check if a measurement command was stored (e.g., via Serial before power cycle)
   if (loadMeasurementCommand()) {
-    // A stored command indicates we are now on battery power.
     batteryMode = true;
-    
-    // If the command explicitly requests removal, remove sensorData.csv.
     if (removeOldFile) {
       fs.remove(LOG_FILENAME);
     }
-    
-    // Choose the file open flags based on removeOldFile.
     int flags = O_WRONLY | O_CREAT;
     if (removeOldFile) {
-      flags |= O_TRUNC;  // start with a new file
+      flags |= O_TRUNC;
     } else {
-      flags |= O_APPEND; // append to the existing file
+      flags |= O_APPEND;
     }
-    
     err = logFile.open(&fs, LOG_FILENAME, flags);
     if (err) {
       Serial.print("Error opening log file: ");
@@ -366,7 +469,7 @@ void setup() {
     writeMetadataToFile();
     Serial.println("Stored measurement command found.");
     Serial.println("Waiting 5 seconds for cable disconnection and power source change...");
-    delay(5000);  // 5-second delay before starting sampling
+    delay(5000);
     startTime = millis();
     currentState = SAMPLING;
     Serial.println("Sampling started...");
@@ -380,16 +483,18 @@ void setup() {
 }
 
 // ---------------------------------------------------
-// Loop: Process commands and perform sampling.
+// Loop function
 // ---------------------------------------------------
 void loop() {
-  // If waiting for a measurement command, also allow retrieval commands.
+  BLE.poll(); // Process BLE events
+
+  // If waiting for a measurement command, allow retrieval commands as well.
   if (currentState == WAITING_FOR_COMMAND) {
     if (Serial.available() > 0) {
       String command = Serial.readStringUntil('\n');
       command.trim();
 
-      // Check for retrieval commands even in WAITING_FOR_COMMAND state.
+      // Check for retrieval commands:
       if (command.equalsIgnoreCase("GETCSV")) {
         Serial.println("Sending CSV file contents:");
         readAndPrintFile(LOG_FILENAME);
@@ -397,13 +502,12 @@ void loop() {
         return;
       }
       else if (command.equalsIgnoreCase("CLRFLAG")) {
-        // Remove done.txt if it exists.
         mbed::File flagCheck;
         int ret = flagCheck.open(&fs, "done.txt", O_RDONLY);
-        if(ret == 0) {
+        if (ret == 0) {
           flagCheck.close();
           int rem = fs.remove("done.txt");
-          if(rem == 0) {
+          if (rem == 0) {
             Serial.println("done.txt removed.");
           } else {
             Serial.print("Error removing done.txt, error code: ");
@@ -412,9 +516,8 @@ void loop() {
         } else {
           Serial.println("done.txt does not exist.");
         }
-        // Also remove sensorData.csv.
         int remCSV = fs.remove(LOG_FILENAME);
-        if(remCSV == 0) {
+        if (remCSV == 0) {
           Serial.println("sensorData.csv removed.");
         } else {
           Serial.print("Error removing sensorData.csv, error code: ");
@@ -427,61 +530,20 @@ void loop() {
         Serial.println("Stop command received. Halting execution.");
         while (true) {}
       }
-      
-      // Otherwise, process as a measurement command.
+
       if (command.length() > 0) {
-        storeMeasurementCommand(command);
-        int firstComma = command.indexOf(',');
-        int secondComma = command.indexOf(',', firstComma + 1);
-        int thirdComma = command.indexOf(',', secondComma + 1);
-        if (firstComma < 0 || secondComma < 0 || thirdComma < 0) {
-          Serial.println("Invalid command format. Please use: frequency,realWorldTime,duration,remove_flag");
-        } else {
-          String freqStr = command.substring(0, firstComma);
-          String timeStr = command.substring(firstComma + 1, secondComma);
-          String durStr  = command.substring(secondComma + 1, thirdComma);
-          String removeStr = command.substring(thirdComma + 1);
-          sampleFrequencyHz = freqStr.toInt();
-          realWorldTime = timeStr.toInt();
-          sampleDurationMin = durStr.toFloat();
-          removeOldFile = (removeStr.toInt() != 0);
-  
-          // Recalculate timing parameters.
-          g_sampleDurationMs = (unsigned long)(sampleDurationMin * 60 * 1000);
-          g_sampleDelayMs = (sampleFrequencyHz > 0) ? (1000 / sampleFrequencyHz) : 10;
-  
-          Serial.println("Measurement parameters updated:");
-          Serial.print("  Frequency (Hz): "); Serial.println(sampleFrequencyHz);
-          Serial.print("  Duration (min): "); Serial.println(sampleDurationMin);
-          Serial.print("  Real-world Time: "); Serial.println(realWorldTime);
-          Serial.print("  Remove old file: "); Serial.println(removeOldFile ? "Yes" : "No");
-  
-          // Choose file open flags.
-          int flags = O_WRONLY | O_CREAT;
-          if (removeOldFile) {
-            flags |= O_TRUNC;  // start fresh
-          } else {
-            flags |= O_APPEND; // append to existing data
-          }
-          int err = logFile.open(&fs, LOG_FILENAME, flags);
-          if (err) {
-            Serial.print("Error opening log file: ");
-            Serial.println(err);
-            return;
-          }
-          writeMetadataToFile();
-  
-          Serial.println("Measurement command received.");
-          Serial.println("Waiting 5 seconds for cable disconnection and power source change...");
-          delay(5000);  // delay before sampling starts
-          startTime = millis();
-          currentState = SAMPLING;
-          Serial.println("Sampling started...");
-        }
+        processMeasurementCommand(command);
+      }
+    }
+    // Also check BLE for commands in WAITING_FOR_COMMAND state.
+    BLEDevice central = BLE.central();
+    if (central) {
+      if (measurementCharacteristic.written()) {
+        String command = measurementCharacteristic.value();
+        processMeasurementCommand(command);
       }
     }
   }
-  // SAMPLING state: record sensor data.
   else if (currentState == SAMPLING) {
     if (batteryMode) {
       if (millis() - previousBlinkTime >= blinkInterval) {
@@ -494,7 +556,6 @@ void loop() {
         }
       }
     }
-  
     unsigned long elapsed = millis() - startTime;
     if (elapsed < g_sampleDurationMs) {
       uint8_t __attribute__((aligned(4))) sensor_data[SENSOR_DATA_LENGTH];
@@ -524,7 +585,6 @@ void loop() {
       Serial.println("Sampling finished. File closed.");
       logFile.close();
       
-      // Create flag file to indicate measurement completion.
       mbed::File flagFile;
       int err = flagFile.open(&fs, "done.txt", O_WRONLY | O_CREAT | O_TRUNC);
       if (!err) {
@@ -538,7 +598,6 @@ void loop() {
       currentState = FINISHED;
     }
   }
-  // FINISHED state: process retrieval commands.
   else if (currentState == FINISHED) {
     if (Serial.available() > 0) {
       String cmd = Serial.readStringUntil('\n');
@@ -549,13 +608,12 @@ void loop() {
         Serial.println("=== End of CSV ===");
       }
       else if (cmd.equalsIgnoreCase("CLRFLAG")) {
-        // Remove done.txt if it exists.
         mbed::File flagCheck;
         int ret = flagCheck.open(&fs, "done.txt", O_RDONLY);
-        if(ret == 0) {
+        if (ret == 0) {
           flagCheck.close();
           int rem = fs.remove("done.txt");
-          if(rem == 0) {
+          if (rem == 0) {
             Serial.println("done.txt removed.");
           } else {
             Serial.print("Error removing done.txt, error code: ");
@@ -564,22 +622,15 @@ void loop() {
         } else {
           Serial.println("done.txt does not exist.");
         }
-        // Remove sensorData.csv.
         int remCSV = fs.remove(LOG_FILENAME);
-        if(remCSV == 0) {
+        if (remCSV == 0) {
           Serial.println("sensorData.csv removed.");
         } else {
           Serial.print("Error removing sensorData.csv, error code: ");
           Serial.println(remCSV);
         }
-        // Set state back to WAITING_FOR_COMMAND after retrieval.
         currentState = WAITING_FOR_COMMAND;
-
-        Serial.println();
-        Serial.print("currentState has been set to WAITING_FOR_COMMAND");
-        Serial.println();
-
-
+        Serial.println("currentState has been set to WAITING_FOR_COMMAND");
       }
       else if (cmd.equalsIgnoreCase("STOP")) {
         Serial.println("Stop command received. Halting execution.");
@@ -590,4 +641,18 @@ void loop() {
       }
     }
   }
+  
+  // Ensure BLE continues to advertise if it stops.
+  if (!BLE.advertise()) {
+    BLE.advertise();
+    Serial.println("Re-advertising BLE...");
+  }
 }
+
+
+
+
+
+
+
+

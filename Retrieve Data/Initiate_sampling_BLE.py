@@ -1,7 +1,6 @@
 import asyncio
-import time  # to get the current timestamp
 from datetime import datetime
-import pytz  # for timezone conversion
+import pytz
 from bleak import BleakClient, BleakScanner
 
 # Measurement parameters
@@ -10,43 +9,58 @@ duration = 0.05     # in minutes
 remove_flag = 1     # 0 = false, 1 = true
 
 # BLE Variables
-n_retries = 10
-t_timeout = 10
+n_scan_retries = 5
+n_conn_retries = 10
+scan_timeout = 10   # seconds
+conn_timeout = 15   # seconds
 
-# Use the MAC determined through find_MAC.py
-DEVICE_ADDRESS = "B6:BE:83:89:82:AA"  # Replace with your Nicla Voice MAC address
+# Device search criteria
+DEVICE_NAME = "NiclaVoice"  # Expected substring in the advertised name
 
 # UUID of the characteristic to write measurement parameters
-CHAR_UUID = "abcdef01-1234-5678-1234-56789abcdef0"  # Ensure this matches the Arduino UUID
+CHAR_UUID = "abcdef01-1234-5678-1234-56789abcdef0"  # Must match the Arduino UUID
+
+async def find_device():
+    for scan_attempt in range(1, n_scan_retries + 1):
+        print(f"Scan attempt {scan_attempt} of {n_scan_retries} (timeout: {scan_timeout}s)...")
+        devices = await BleakScanner.discover(timeout=scan_timeout)
+        for d in devices:
+            print(f"  Found: {d.address} - {d.name}")
+            if d.name and DEVICE_NAME.lower() in d.name.lower():
+                print(f"Device matching '{DEVICE_NAME}' found: {d.address}")
+                return d
+        print("Device not found in this scan. Retrying...")
+        await asyncio.sleep(1)
+    print(f"Device '{DEVICE_NAME}' was not found after {n_scan_retries} scan attempts.")
+    return None
 
 async def send_measurement_parameters():
-    max_retries = n_retries
-    for attempt in range(1, max_retries + 1):
-        print(f"Attempt {attempt} to connect to Nicla Voice at {DEVICE_ADDRESS}...")
+    device = await find_device()
+    if device is None:
+        return
+
+    for attempt in range(1, n_conn_retries + 1):
+        print(f"Connection attempt {attempt} to {device.address}...")
         try:
-            async with BleakClient(DEVICE_ADDRESS, timeout=t_timeout) as client:
+            async with BleakClient(device.address, timeout=conn_timeout) as client:
                 if not client.is_connected:
-                    print(f"Failed to connect on attempt {attempt}.")
+                    print("Connection failed.")
                     continue
-
-                print("Connected! Sending measurement parameters...")
-
-                # Get the actual Unix timestamp in the correct timezone (Europe/Amsterdam)
-                tz = pytz.timezone("Europe/Amsterdam")  # UTC+1 in winter, UTC+2 in summer
+                print("Connected!")
+                # Get the actual Unix timestamp in Europe/Amsterdam timezone
+                tz = pytz.timezone("Europe/Amsterdam")
                 real_world_time = int(datetime.now(tz).timestamp())
 
-                # Format the command string
                 command = f"{frequency},{real_world_time},{duration},{remove_flag}"
                 print(f"Sending command: {command}")
-
                 await client.write_gatt_char(CHAR_UUID, command.encode())
-                print("Parameters sent successfully! Disconnecting...")
-                return  # exit function after success
+                print("Parameters sent successfully!")
+                return  # Exit after success
         except Exception as e:
-            print(f"Error on attempt {attempt}: {e}")
+            print(f"Error on connection attempt {attempt}: {e}")
         print("Retrying connection in 1 second...")
         await asyncio.sleep(1)
-    print("Exceeded maximum retry attempts. Could not connect to Nicla Voice.")
+    print("Exceeded maximum connection retry attempts.")
 
 if __name__ == "__main__":
     asyncio.run(send_measurement_parameters())
