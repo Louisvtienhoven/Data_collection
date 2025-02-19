@@ -2,7 +2,7 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/Nicla Voice/libraries/arduino-audio-tools" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/Nicla Voice/libraries/arduino-libg722" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/1. Nicla Voice/libraries/arduino-audio-tools" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/1. Nicla Voice/libraries/arduino-libg722" vcs="Git" />
   </component>
 </project>
