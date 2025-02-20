@@ -380,8 +380,8 @@ void setup() {
     }
     writeMetadataToFile();
     Serial.println("Stored measurement command found.");
-    Serial.println("Waiting 5 seconds for cable disconnection and power source change...");
-    delay(5000);
+    Serial.println("Waiting 10 seconds for cable disconnection and power source change...");
+    delay(10000);
     startTime = millis();
     currentState = SAMPLING;
     Serial.println("Sampling started...");
@@ -561,16 +561,21 @@ void loop() {
   }
   // FINISHED state: process retrieval commands and blink LED red/blue every 3 seconds.
   else if (currentState == FINISHED) {
-    // Blink LED: alternate red and blue every 3 seconds.
+
+    // Short blink red, short blink blue, then wait 3 seconds
     if (millis() - previousBlinkTime >= 3000) {
       previousBlinkTime = millis();
-      ledOn = !ledOn;
-      if (ledOn) {
-        nicla::leds.setColor(255, 0, 0);  // Red
-      } else {
-        nicla::leds.setColor(0, 0, 255);  // Blue
-      }
+
+      nicla::leds.setColor(255, 0, 0);  // Red
+      delay(100);  // Short blink duration
+      nicla::leds.setColor(0, 0, 0);    // Turn off
+      delay(100);
+
+      nicla::leds.setColor(0, 0, 255);  // Blue
+      delay(100);  
+      nicla::leds.setColor(0, 0, 0);    // Turn off
     }
+
     
     // Process Serial commands in FINISHED state.
     if (Serial.available() > 0) {

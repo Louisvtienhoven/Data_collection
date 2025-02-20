@@ -15,7 +15,7 @@ BAUD_RATE = 115200
 # Delay before the measurement starts (in seconds)
 # Delay stems from the uploaded Arduino code
 
-delay = 5 # seconds
+delay = 10 # seconds
 
 def send_measurement_parameters():
     try:

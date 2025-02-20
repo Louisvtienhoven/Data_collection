@@ -5,8 +5,8 @@ from datetime import datetime
 import pytz  # for timezone conversion
 
 # Measurement parameters (fallback defaults)
-frequency = 75  # Hz
-duration = 0.05  # in minutes
+frequency = 0  # Hz
+duration = 0  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 
 # USB Serial configuration (update port name as necessary)
