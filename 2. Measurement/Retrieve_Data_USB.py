@@ -56,7 +56,7 @@ if __name__ == '__main__':
     timestamp_str = now.strftime("%Y-%m-%d_%H-%M-%S")
 
     # Build the filename using the measurement parameters and the timestamp.
-    filename = f"downloaded_{frequency}Hz_{duration}min_{timestamp_str}.csv"
+    filename = f"{frequency}Hz_{duration}min_{timestamp_str}.csv"
     file_path = os.path.join(SAVE_DIR, filename)
 
     # Save the CSV data to the local file in the specified directory.
