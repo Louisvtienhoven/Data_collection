@@ -491,8 +491,8 @@ void loop() {
           writeMetadataToFile();
   
           Serial.println("Measurement command received.");
-          Serial.println("Waiting 5 seconds for cable disconnection and power source change...");
-          delay(5000);  // delay before sampling starts
+          Serial.println("Waiting 10 seconds for cable disconnection and power source change...");
+          delay(10000);  // delay before sampling starts
           startTime = millis();
           currentState = SAMPLING;
           Serial.println("Sampling started...");
