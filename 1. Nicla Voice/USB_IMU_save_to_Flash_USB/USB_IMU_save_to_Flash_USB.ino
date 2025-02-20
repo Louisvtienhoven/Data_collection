@@ -296,6 +296,17 @@ void loop() {
     }
   }
   else if (measState == SAMPLING) {
+
+    if (millis() - previousBlinkTime >= blinkInterval) {
+      previousBlinkTime = millis();
+      ledOn = !ledOn;
+      if (ledOn) {
+        nicla::leds.setColor(0, 255, 0);
+      } else {
+        nicla::leds.setColor(0, 0, 0);
+      }
+    }
+    
     unsigned long elapsed = millis() - startTime;
     if (elapsed < sampleDurationMs) {
       uint8_t __attribute__((aligned(4))) sensor_data[SENSOR_DATA_LENGTH];
@@ -327,6 +338,8 @@ void loop() {
       measState = SAMPLING_DONE;
     }
   }
+
+
   else if (measState == SAMPLING_DONE) {
     if (Serial.available() > 0) {
       String command = Serial.readStringUntil('\n');

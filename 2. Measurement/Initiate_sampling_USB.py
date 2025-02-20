@@ -4,7 +4,7 @@ from datetime import datetime
 import pytz  # for timezone conversion
 
 # Measurement parameters
-frequency = 75  # Hz
+frequency = 25  # Hz
 duration = 0.05  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 
@@ -12,6 +12,10 @@ remove_flag = 1  # 0 = false, 1 = true
 SERIAL_PORT = "COM3"  # Change this if needed
 BAUD_RATE = 115200
 
+# Delay before the measurement starts (in seconds)
+# Delay stems from the uploaded Arduino code
+
+delay = 5 # seconds
 
 def send_measurement_parameters():
     try:
@@ -31,6 +35,8 @@ def send_measurement_parameters():
             # Format the command string (must match the Arduino format).
             command = f"{frequency},{real_world_time},{duration},{remove_flag}\n"
             print(f"Sending command: {command.strip()}")
+            print(f"Change power source within {delay} seconds before measurement starts")
+            print(f"Be aware that the measurement command is deleted once the measurement starts")
 
             # Send the command over USB Serial.
             ser.write(command.encode())

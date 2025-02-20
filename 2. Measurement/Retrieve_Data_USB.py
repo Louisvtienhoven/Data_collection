@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 import pytz  # for timezone conversion
 
-# Measurement parameters
+# Measurement parameters (fallback defaults)
 frequency = 75  # Hz
 duration = 0.05  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
@@ -44,19 +44,61 @@ def retrieve_csv():
     return csv_data, flag_response
 
 
+def parse_parameters(csv_data):
+    """
+    Extract the measurement parameters from the CSV header.
+    Expected header lines:
+      Sampling Frequency [Hz]:25
+      Sample Duration [Min]:0.50
+      Time:2025-02-20 11:45:38
+    """
+    frequency_param = None
+    duration_param = None
+    time_param = None
+    # Split into individual lines
+    lines = csv_data.splitlines()
+    for line in lines:
+        if "Sampling Frequency" in line:
+            # e.g., "Sampling Frequency [Hz]:25"
+            parts = line.split(":")
+            if len(parts) >= 2:
+                frequency_param = parts[1].strip()
+        elif "Sample Duration" in line:
+            # e.g., "Sample Duration [Min]:0.50"
+            parts = line.split(":")
+            if len(parts) >= 2:
+                duration_param = parts[1].strip()
+        elif line.startswith("Time:"):
+            # e.g., "Time:2025-02-20 11:45:38"
+            parts = line.split("Time:")
+            if len(parts) >= 2:
+                time_param = parts[1].strip()
+        # Stop once all three have been found.
+        if frequency_param and duration_param and time_param:
+            break
+    return frequency_param, duration_param, time_param
+
+
 if __name__ == '__main__':
     csv_content, flag_resp = retrieve_csv()
     print("Retrieved CSV Data:")
     print(csv_content)
-    print("Flag response:")
-    print(flag_resp)
+    # Optionally, print the flag response:
+    # print("Flag response:")
+    # print(flag_resp)
 
-    # Get current time for the filename. Adjust the timezone if desired.
-    now = datetime.now(pytz.timezone("Europe/Amsterdam"))
-    timestamp_str = now.strftime("%Y-%m-%d_%H-%M-%S")
+    # Try to parse the measurement parameters from the CSV header.
+    freq_par, dur_par, time_par = parse_parameters(csv_content)
+    if freq_par and dur_par and time_par:
+        # Replace spaces and colons in time string for filename safety.
+        safe_time = time_par.replace(" ", "_").replace(":", "-")
+        filename = f"{freq_par}Hz_{dur_par}min_{safe_time}.csv"
+    else:
+        # If parsing fails, fall back to using current time and default parameters.
+        now = datetime.now(pytz.timezone("Europe/Amsterdam"))
+        timestamp_str = now.strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"{frequency}Hz_{duration}min_{timestamp_str}.csv"
 
-    # Build the filename using the measurement parameters and the timestamp.
-    filename = f"{frequency}Hz_{duration}min_{timestamp_str}.csv"
     file_path = os.path.join(SAVE_DIR, filename)
 
     # Save the CSV data to the local file in the specified directory.

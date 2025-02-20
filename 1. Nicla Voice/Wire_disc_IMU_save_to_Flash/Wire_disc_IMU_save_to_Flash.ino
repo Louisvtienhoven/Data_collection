@@ -77,8 +77,25 @@ MeasurementState currentState = WAITING_FOR_COMMAND;
 // ---------------------------------------------------
 bool batteryMode = false;               // set true if measurement loaded from flash
 unsigned long previousBlinkTime = 0;
-const unsigned long blinkInterval = 500;  // blink every 500ms
+const unsigned long blinkInterval = 500;  // Used during SAMPLING in battery mode
 bool ledOn = false;
+
+// ---------------------------------------------------
+// Startup Blink Function: Blink red followed by blue
+// ---------------------------------------------------
+void startupBlink() {
+  // Blink red for 500ms then off for 250ms
+  nicla::leds.setColor(255, 0, 0);
+  delay(500);
+  nicla::leds.setColor(0, 0, 0);
+  delay(250);
+  
+  // Blink blue for 500ms then off for 250ms
+  nicla::leds.setColor(0, 0, 255);
+  delay(500);
+  nicla::leds.setColor(0, 0, 0);
+  delay(250);
+}
 
 // ---------------------------------------------------
 // Function: Write one CSV line to the open file
@@ -228,8 +245,6 @@ bool loadMeasurementCommand() {
   Serial.print("  Frequency (Hz): "); Serial.println(sampleFrequencyHz);
   Serial.print("  Duration (min): "); Serial.println(sampleDurationMin);
   Serial.print("  Real-world Time: "); Serial.println(realWorldTime);
-  Serial.print("Please note that the actual time of the start of the measurement is \
-  somewhat later because of changing the power source and allowing for the PCB to restart");
   Serial.print("  Remove old file: "); Serial.println(removeOldFile ? "Yes" : "No");
   
   // Remove the stored command so it doesn't restart measurement again unintentionally
@@ -245,7 +260,7 @@ void setup() {
   Serial.begin(115200);
   delay(3000);
   Serial.println("\n--- Nicla Voice: BMI270 to SPI Flash Demo ---");
-  
+
   // 1) Initialize SPI Flash & LittleFS
   Serial.print("Mounting LittleFS... ");
   spif = mbed::BlockDevice::get_default_instance();
@@ -291,6 +306,8 @@ void setup() {
   nicla::begin();
   nicla::disableLDO();
   nicla::leds.begin();
+
+  
   Serial.println("- NDP processor initialization...");
   NDP.begin("mcu_fw_120_v91.synpkg");
   NDP.load("dsp_firmware_v91.synpkg");
@@ -344,17 +361,15 @@ void setup() {
     // A stored command indicates we are now on battery power.
     batteryMode = true;
     
-    // If the command explicitly requests removal, remove sensorData.csv.
     if (removeOldFile) {
       fs.remove(LOG_FILENAME);
     }
     
-    // Choose the file open flags based on removeOldFile.
     int flags = O_WRONLY | O_CREAT;
     if (removeOldFile) {
-      flags |= O_TRUNC;  // start with a new file
+      flags |= O_TRUNC;
     } else {
-      flags |= O_APPEND; // append to the existing file
+      flags |= O_APPEND;
     }
     
     err = logFile.open(&fs, LOG_FILENAME, flags);
@@ -366,7 +381,7 @@ void setup() {
     writeMetadataToFile();
     Serial.println("Stored measurement command found.");
     Serial.println("Waiting 5 seconds for cable disconnection and power source change...");
-    delay(5000);  // 5-second delay before starting sampling
+    delay(5000);
     startTime = millis();
     currentState = SAMPLING;
     Serial.println("Sampling started...");
@@ -377,6 +392,10 @@ void setup() {
     Serial.println("Example: 65,1708531200,0.05,1");
     currentState = WAITING_FOR_COMMAND;
   }
+
+  // Call the startup blink: red then blue.
+  startupBlink();
+  
 }
 
 // ---------------------------------------------------
@@ -536,10 +555,24 @@ void loop() {
       }
       
       currentState = FINISHED;
+      // Reset previousBlinkTime so that the FINISHED blinking starts immediately.
+      previousBlinkTime = millis();
     }
   }
-  // FINISHED state: process retrieval commands.
+  // FINISHED state: process retrieval commands and blink LED red/blue every 3 seconds.
   else if (currentState == FINISHED) {
+    // Blink LED: alternate red and blue every 3 seconds.
+    if (millis() - previousBlinkTime >= 3000) {
+      previousBlinkTime = millis();
+      ledOn = !ledOn;
+      if (ledOn) {
+        nicla::leds.setColor(255, 0, 0);  // Red
+      } else {
+        nicla::leds.setColor(0, 0, 255);  // Blue
+      }
+    }
+    
+    // Process Serial commands in FINISHED state.
     if (Serial.available() > 0) {
       String cmd = Serial.readStringUntil('\n');
       cmd.trim();
@@ -574,12 +607,10 @@ void loop() {
         }
         // Set state back to WAITING_FOR_COMMAND after retrieval.
         currentState = WAITING_FOR_COMMAND;
-
+  
         Serial.println();
         Serial.print("currentState has been set to WAITING_FOR_COMMAND");
         Serial.println();
-
-
       }
       else if (cmd.equalsIgnoreCase("STOP")) {
         Serial.println("Stop command received. Halting execution.");

@@ -2,7 +2,7 @@ import csv
 import numpy as np
 
 # Path to the downloaded CSV file
-file_path = 'C:\Users\Louis\MSc-Thesis-Louis\3. Collected Data\downloaded_75Hz_0.05min_2025-02-19_17-19-58.csv'
+file_path = r'C:\Users\Louis\MSc-Thesis-Louis\3. Collected Data\downloaded_75Hz_0.05min_2025-02-19_17-19-58.csv'
 def read_sensor_data(file_path):
     data = []
 
