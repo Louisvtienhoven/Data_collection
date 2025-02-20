@@ -15,7 +15,7 @@ scan_timeout = 10   # seconds
 conn_timeout = 15   # seconds
 
 # Device search criteria
-DEVICE_NAME = "NiclaVoice"  # Expected substring in the advertised name
+DEVICE_NAME = "NiclaVoice1"  # Use either NiclaVoice1 or NiclaVoice2
 
 # UUID of the characteristic to write measurement parameters
 CHAR_UUID = "abcdef01-1234-5678-1234-56789abcdef0"  # Must match the Arduino UUID
