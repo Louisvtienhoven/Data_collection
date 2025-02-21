@@ -14,7 +14,7 @@ SERIAL_PORT = 'COM3'  # For Windows (e.g., "COM3"); use "/dev/ttyACM0" on Linux/
 BAUD_RATE = 115200
 
 # Directory to save the collected data
-SAVE_DIR = r"C:\Users\Louis\MSc-Thesis-Louis\3. Collected Data"
+SAVE_DIR = r"C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Data"
 
 # Ensure the directory exists
 os.makedirs(SAVE_DIR, exist_ok=True)
