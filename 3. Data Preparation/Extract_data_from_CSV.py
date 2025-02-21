@@ -1,6 +1,9 @@
 import csv
 import numpy as np
+import os
 
+# Path to CSV file with the collected data
+file_path = r'C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Data\25Hz_0.05min_2025-02-20_17-14-14.csv'
 def read_sensor_data(file_path):
     data = []
     with open(file_path, 'r') as file:
@@ -10,7 +13,7 @@ def read_sensor_data(file_path):
             if len(row) != 6:
                 continue
             try:
-                # Try converting all values in the row to float.
+                # Convert all values in the row to float.
                 float_row = list(map(float, row))
                 data.append(float_row)
             except ValueError:
@@ -22,8 +25,7 @@ def read_sensor_data(file_path):
     else:
         return np.array([])
 
-# Path to the downloaded CSV file
-file_path = r'C:\Users\Louis\MSc-Thesis-Louis\3. Collected Data\25Hz_0.05min_2025-02-20_17-14-14.csv'
+
 
 data_arrays = read_sensor_data(file_path)
 if data_arrays.size:
@@ -36,5 +38,18 @@ if data_arrays.size:
     print("gx:", gx[:5])
     print("gy:", gy[:5])
     print("gz:", gz[:5])
+
+    # Derive the output NPZ file name from the CSV file name.
+    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    npz_file_name = base_name + ".npz"
+
+    # Set the output folder.
+    output_folder = r"C:\Users\Louis\MSc-Thesis-Louis\3. Data Preparation\Extracted Data"
+    # Combine folder path and file name.
+    output_path = os.path.join(output_folder, npz_file_name)
+
+    # Save the numpy arrays to an NPZ file.
+    np.savez(output_path, ax=ax, ay=ay, az=az, gx=gx, gy=gy, gz=gz)
+    print(f"Sensor data saved to '{output_path}'.")
 else:
     print("No valid sensor data found.")
