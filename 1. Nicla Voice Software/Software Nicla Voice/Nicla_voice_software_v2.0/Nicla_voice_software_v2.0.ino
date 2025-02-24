@@ -1,4 +1,28 @@
-// To include the Arduino framework 
+/*
+ * Nicla Voice BMI270 to SPI Flash Demo
+ *
+ * This program runs on a Nicla Voice board and uses the BMI270 sensor to collect
+ * accelerometer and gyroscope data. The sensor data is logged to a CSV file on SPI Flash
+ * via the LittleFS filesystem. A state machine governs the program operation:
+ *
+ *   - WAITING_FOR_COMMAND: The device waits for a measurement command via Serial.
+ *     In this state, a slow blue LED blink indicates that the system is idle.
+ *
+ *   - SAMPLING: Once a command is received (or stored), the device collects sensor data
+ *     at a specified frequency for a defined duration, blinking the LED (green) during sampling.
+ *
+ *   - FINISHED: When sampling is complete, the system creates a flag file and waits for
+ *     retrieval commands (e.g., GETCSV, CLRFLAG, STOP). A short red/blue LED blink sequence
+ *     indicates this state.
+ *
+ * Serial commands supported include:
+ *   GETCSV  - Read and output the CSV file.
+ *   CLRFLAG - Remove the flag and stored files.
+ *   STOP    - Halt program execution.
+ *
+ * The measurement command (format: frequency,realWorldTime,duration,remove_flag) can also be stored in flash.
+ */
+
 #include <Arduino.h>
 #include <TimeLib.h>         // Provides setTime(), year(), etc.
 
@@ -73,11 +97,11 @@ enum MeasurementState {
 MeasurementState currentState = WAITING_FOR_COMMAND;
 
 // ---------------------------------------------------
-// Global variables for LED blinking in battery mode
+// Global variables for LED blinking
 // ---------------------------------------------------
 bool batteryMode = false;               // set true if measurement loaded from flash
 unsigned long previousBlinkTime = 0;
-const unsigned long blinkInterval = 500;  // Used during SAMPLING in battery mode
+const unsigned long blinkInterval = 500;  // Used during SAMPLING state
 bool ledOn = false;
 
 // ---------------------------------------------------
@@ -415,7 +439,6 @@ void loop() {
       }
     }
 
-
     if (Serial.available() > 0) {
       String command = Serial.readStringUntil('\n');
       command.trim();
@@ -517,7 +540,6 @@ void loop() {
       }
     }
   }
-
   else if (currentState == SAMPLING) {
     // Always blink LED during sampling.
     unsigned long currentMillis = millis();
@@ -579,7 +601,6 @@ void loop() {
   }
   // FINISHED: Process retrieval commands and blink LED.
   else if (currentState == FINISHED) {
-    
     // Short blink red, short blink blue, then wait 3 seconds
     if (millis() - previousBlinkTime >= 3000) {
       previousBlinkTime = millis();
@@ -593,8 +614,6 @@ void loop() {
       delay(100);  
       nicla::leds.setColor(0, 0, 0);    // Turn off
     }
-
-
 
     if (Serial.available() > 0) {
       String command = Serial.readStringUntil('\n');
@@ -642,6 +661,5 @@ void loop() {
         while (true) {}
       }
     }
-    
   }
 }
