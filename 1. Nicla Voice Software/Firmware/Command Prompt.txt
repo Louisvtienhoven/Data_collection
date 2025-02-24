@@ -1,0 +1,8 @@
+"C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\syntiant-uploader-win.exe" send -m "Y" -w "Y" -p COM4 "C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\mcu_fw_120_v91.synpkg"
+
+"C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\syntiant-uploader-win.exe" send -m "Y" -w "Y" -p COM4 "C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\dsp_firmware_v91.synpkg"
+
+"C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\syntiant-uploader-win.exe" send -m "Y" -w "Y" -p COM3 "C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\mcu_fw_120_v91.synpkg"
+
+"C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\syntiant-uploader-win.exe" send -m "Y" -w "Y" -p COM3 "C:\Users\Louis\MSc-Thesis-Louis\1. Nicla Voice Software\Firmware\dsp_firmware_v91.synpkg"
+

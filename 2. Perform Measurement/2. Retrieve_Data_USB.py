@@ -5,8 +5,8 @@ from datetime import datetime
 import pytz  # for timezone conversion
 
 # Measurement parameters (fallback defaults)
-frequency = 0  # Hz
-duration = 0  # in minutes
+frequency = 75  # Hz
+duration = 0.5  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 
 # USB Serial configuration (update port name as necessary)
@@ -21,9 +21,19 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 
 
 def retrieve_csv():
-    # Open the serial port.
-    ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=10)
+    try:
+        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=10)
+    except serial.SerialException as e:
+        print("Error: Serial connection could not be established:", e)
+        return None, None
+
     time.sleep(2)  # Allow time for the serial connection to initialize
+
+    if ser.is_open:
+        print("Serial connection established successfully on", SERIAL_PORT)
+    else:
+        print("Serial connection is not open!")
+        return None, None
 
     # Clear any existing data in the input buffer.
     ser.reset_input_buffer()
@@ -59,21 +69,17 @@ def parse_parameters(csv_data):
     lines = csv_data.splitlines()
     for line in lines:
         if "Sampling Frequency" in line:
-            # e.g., "Sampling Frequency [Hz]:25"
             parts = line.split(":")
             if len(parts) >= 2:
                 frequency_param = parts[1].strip()
         elif "Sample Duration" in line:
-            # e.g., "Sample Duration [Min]:0.50"
             parts = line.split(":")
             if len(parts) >= 2:
                 duration_param = parts[1].strip()
         elif line.startswith("Time:"):
-            # e.g., "Time:2025-02-20 11:45:38"
             parts = line.split("Time:")
             if len(parts) >= 2:
                 time_param = parts[1].strip()
-        # Stop once all three have been found.
         if frequency_param and duration_param and time_param:
             break
     return frequency_param, duration_param, time_param
@@ -81,27 +87,29 @@ def parse_parameters(csv_data):
 
 if __name__ == '__main__':
     csv_content, flag_resp = retrieve_csv()
-    print("Retrieved CSV Data:")
-    print(csv_content)
-    # Optionally, print the flag response:
-    # print("Flag response:")
-    # print(flag_resp)
-
-    # Try to parse the measurement parameters from the CSV header.
-    freq_par, dur_par, time_par = parse_parameters(csv_content)
-    if freq_par and dur_par and time_par:
-        # Replace spaces and colons in time string for filename safety.
-        safe_time = time_par.replace(" ", "_").replace(":", "-")
-        filename = f"{freq_par}Hz_{dur_par}min_{safe_time}.csv"
+    if csv_content is None:
+        print("CSV retrieval failed due to serial connection issues.")
     else:
-        # If parsing fails, fall back to using current time and default parameters.
-        now = datetime.now(pytz.timezone("Europe/Amsterdam"))
-        timestamp_str = now.strftime("%Y-%m-%d_%H-%M-%S")
-        filename = f"{frequency}Hz_{duration}min_{timestamp_str}.csv"
+        print("Retrieved CSV Data:")
+        print(csv_content)
 
-    file_path = os.path.join(SAVE_DIR, filename)
+        # Optionally, print the flag response:
+        # print("Flag response:")
+        # print(flag_resp)
 
-    # Save the CSV data to the local file in the specified directory.
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(csv_content)
-    print(f"CSV file saved as '{file_path}'.")
+        # Try to parse the measurement parameters from the CSV header.
+        freq_par, dur_par, time_par = parse_parameters(csv_content)
+        if freq_par and dur_par and time_par:
+            # Replace spaces and colons in time string for filename safety.
+            safe_time = time_par.replace(" ", "_").replace(":", "-")
+            filename = f"{freq_par}Hz_{dur_par}min_{safe_time}.csv"
+        else:
+            now = datetime.now(pytz.timezone("Europe/Amsterdam"))
+            timestamp_str = now.strftime("%Y-%m-%d_%H-%M-%S")
+            filename = f"{frequency}Hz_{duration}min_{timestamp_str}.csv"
+
+        file_path = os.path.join(SAVE_DIR, filename)
+
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(csv_content)
+        print(f"CSV file saved as '{file_path}'.")
