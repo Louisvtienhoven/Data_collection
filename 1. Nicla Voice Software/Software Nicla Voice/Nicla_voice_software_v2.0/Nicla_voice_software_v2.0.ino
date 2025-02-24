@@ -404,8 +404,8 @@ void setup() {
     }
     writeMetadataToFile();
     Serial.println("Stored measurement command found.");
-    Serial.println("Waiting 10 seconds for cable disconnection and power source change...");
-    delay(10000);
+    // Serial.println("Waiting 10 seconds for cable disconnection and power source change...");
+    // delay(10000);
     startTime = millis();
     currentState = SAMPLING;
     Serial.println("Sampling started...");
@@ -519,6 +519,9 @@ void loop() {
           Serial.print("  Real-world Time: "); Serial.println(realWorldTime);
           Serial.print("  Remove old file: "); Serial.println(removeOldFile ? "Yes" : "No");
 
+          Serial.println("Waiting 10 seconds for cable disconnection and power source change...");
+          delay(10000);  // Wait 10 seconds before starting sampling
+
           // Remove existing file if commanded.
           if (removeOldFile) {
             fs.remove(LOG_FILENAME);
@@ -533,6 +536,9 @@ void loop() {
             while (true) {}
           }
           writeMetadataToFile();
+
+
+
           startTime = millis();
           currentState = SAMPLING;
           Serial.println("Sampling started...");
@@ -663,3 +669,32 @@ void loop() {
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -5,7 +5,7 @@ import pytz  # for timezone conversion
 
 # Measurement parameters
 frequency = 25  # Hz
-duration = 0.2  # in minutes
+duration = 10  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 
 # Manually set the COM port and baud rate
