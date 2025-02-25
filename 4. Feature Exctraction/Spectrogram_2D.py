@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # Define file path and sampling frequency.
-npz_file_path = r"C:\Users\Louis\MSc-Thesis-Louis\3. Data Preparation\Extracted Data\25Hz_0.05min_2025-02-20_17-14-14.npz"
+npz_file_path = r"C:\Users\Louis\MSc-Thesis-Louis\3. Data Preparation\Extracted Data\25Hz_2.00min_2025-02-25_14-04-01.npz"
 fs = 25  # Sampling frequency (Hz)
 keys = ['ax', 'ay', 'az', 'gx', 'gy', 'gz']
 

@@ -60,7 +60,7 @@ def retrieve_csv():
                     temp_file.write(new_data)
                     total_bytes += len(new_data)
                     last_data_time = time.time()  # Reset timer when new data arrives.
-                    print(f"Received {len(new_data)} bytes, total {total_bytes} bytes")
+                    #print(f"Received {len(new_data)} bytes, total {total_bytes} bytes")
             # End loop if no new data arrives within the timeout period.
             if time.time() - last_data_time > timeout_period:
                 print(f"No new data received for {timeout_period} seconds. Ending read.")

@@ -4,8 +4,8 @@ from datetime import datetime
 import pytz  # for timezone conversion
 
 # Measurement parameters
-frequency = 50  # Hz
-duration = 0.17  # in minutes
+frequency = 25  # Hz
+duration = 2  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 
 # Manually set the COM port and baud rate

@@ -48,7 +48,7 @@ static const char* LOG_FILENAME = "sensorData.csv";
 // ---------------------------------------------------
 
 // Sampling duration in minutes (e.g., 0.2 = 12 seconds)
-static const float SAMPLE_DURATION_MIN = 0.2;  // Change as needed
+static const float SAMPLE_DURATION_MIN = 2;  // Change as needed
 // Sampling frequency in Hz
 static const unsigned int SAMPLE_FREQUENCY_HZ = 100;  // Change as needed
 // Real-world time (Unix timestamp; will be updated later via BLE)

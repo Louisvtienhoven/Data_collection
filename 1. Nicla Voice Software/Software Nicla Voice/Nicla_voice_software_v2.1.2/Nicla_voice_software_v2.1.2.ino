@@ -111,6 +111,7 @@ void flushBuffer() {
 void writeToBuffer(float ax, float ay, float az,
                    float gx, float gy, float gz)
 {
+  unsigned long t = millis()/1000;
   char lineBuf[128];
   int n = snprintf(lineBuf, sizeof(lineBuf),
                    "%lu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
@@ -549,13 +550,13 @@ void loop() {
     int status = NDP.sensorBMI270Read(READ_START_ADDRESS, READ_BYTE_COUNT, sensor_data);
     CHECK_STATUS(status);
 
-    // Extract raw values.
-    int16_t ax_raw = (int16_t)((sensor_data[0] << 8) | sensor_data[1]);
-    int16_t ay_raw = (int16_t)((sensor_data[2] << 8) | sensor_data[3]);
-    int16_t az_raw = (int16_t)((sensor_data[4] << 8) | sensor_data[5]);
-    int16_t gx_raw = (int16_t)((sensor_data[6] << 8) | sensor_data[7]);
-    int16_t gy_raw = (int16_t)((sensor_data[8] << 8) | sensor_data[9]);
-    int16_t gz_raw = (int16_t)((sensor_data[10] << 8) | sensor_data[11]);
+    // Extract raw values with correct byte order.
+    int16_t ax_raw = (int16_t)((sensor_data[1] << 8) | sensor_data[0]);
+    int16_t ay_raw = (int16_t)((sensor_data[3] << 8) | sensor_data[2]);
+    int16_t az_raw = (int16_t)((sensor_data[5] << 8) | sensor_data[4]);
+    int16_t gx_raw = (int16_t)((sensor_data[7] << 8) | sensor_data[6]);
+    int16_t gy_raw = (int16_t)((sensor_data[9] << 8) | sensor_data[8]);
+    int16_t gz_raw = (int16_t)((sensor_data[11] << 8) | sensor_data[10]);
 
     // Convert raw sensor data.
     float ax = (float)ax_raw * ACCEL_SCALE_FACTOR;

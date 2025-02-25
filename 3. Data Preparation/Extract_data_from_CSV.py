@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 # Path to CSV file with the collected data
-file_path = r'C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Data\25Hz_0.05min_2025-02-20_17-14-14.csv'
+file_path = r'C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Data\25Hz_2.00min_2025-02-25_14-04-01.csv'
 def read_sensor_data(file_path):
     data = []
     with open(file_path, 'r') as file:
