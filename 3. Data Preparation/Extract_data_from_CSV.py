@@ -1,33 +1,47 @@
 import csv
 import numpy as np
 import os
+import glob
 
-# Path to CSV file with the collected data
-file_path = r'C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Data\25Hz_2.00min_2025-02-25_14-04-01.csv'
+# Directory containing CSV files with collected data
+data_folder = r'C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Data'
+
+# Get a list of all CSV files in the folder.
+csv_files = glob.glob(os.path.join(data_folder, '*.csv'))
+if not csv_files:
+    print("No CSV files found in the folder.")
+    exit()
+
+# Select the most recent CSV file based on modification time.
+most_recent_file = max(csv_files, key=os.path.getmtime)
+print(f"Most recent CSV file found: {most_recent_file}")
+
 def read_sensor_data(file_path):
     data = []
     with open(file_path, 'r') as file:
         reader = csv.reader(file)
         for row in reader:
-            # Skip rows that do not have exactly 6 elements.
-            if len(row) != 6:
-                continue
-            try:
-                # Convert all values in the row to float.
-                float_row = list(map(float, row))
-                data.append(float_row)
-            except ValueError:
-                # If conversion fails, skip this row.
-                continue
-    # If valid data exists, transpose it to separate columns.
+            # Handle rows with exactly 6 elements.
+            if len(row) == 6:
+                try:
+                    float_row = list(map(float, row))
+                    data.append(float_row)
+                except ValueError:
+                    continue
+            # Handle rows with 7 elements by ignoring the first element (timestamp).
+            elif len(row) == 7:
+                try:
+                    float_row = list(map(float, row[1:]))  # Skip the timestamp column
+                    data.append(float_row)
+                except ValueError:
+                    continue
+            # Skip rows that don't have 6 or 7 elements.
     if data:
         return np.array(data).T
     else:
         return np.array([])
 
-
-
-data_arrays = read_sensor_data(file_path)
+data_arrays = read_sensor_data(most_recent_file)
 if data_arrays.size:
     ax, ay, az, gx, gy, gz = data_arrays
 
@@ -40,7 +54,7 @@ if data_arrays.size:
     print("gz:", gz[:5])
 
     # Derive the output NPZ file name from the CSV file name.
-    base_name = os.path.splitext(os.path.basename(file_path))[0]
+    base_name = os.path.splitext(os.path.basename(most_recent_file))[0]
     npz_file_name = base_name + ".npz"
 
     # Set the output folder.

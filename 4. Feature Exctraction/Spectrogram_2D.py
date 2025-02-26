@@ -2,12 +2,24 @@ import numpy as np
 from scipy.signal import spectrogram
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import os
+import glob
 
-# Define file path and sampling frequency.
-npz_file_path = r"C:\Users\Louis\MSc-Thesis-Louis\3. Data Preparation\Extracted Data\25Hz_2.00min_2025-02-25_14-04-01.npz"
+# Define the folder containing NPZ files.
+npz_folder = r"C:\Users\Louis\MSc-Thesis-Louis\3. Data Preparation\Extracted Data"
+
+# Get a list of all NPZ files in the folder.
+npz_files = glob.glob(os.path.join(npz_folder, '*.npz'))
+if not npz_files:
+    print("No NPZ files found in the folder.")
+    exit()
+
+# Select the most recent NPZ file based on modification time.
+most_recent_npz = max(npz_files, key=os.path.getmtime)
+print(f"Most recent NPZ file found: {most_recent_npz}")
+
 fs = 25  # Sampling frequency (Hz)
 keys = ['ax', 'ay', 'az', 'gx', 'gy', 'gz']
-
 
 def plot_six_spectrograms(npz_file_path):
     data = np.load(npz_file_path)
@@ -52,7 +64,6 @@ def plot_six_spectrograms(npz_file_path):
     )
     fig.show()
 
-
 def plot_six_ffts(npz_file_path):
     data = np.load(npz_file_path)
 
@@ -96,7 +107,6 @@ def plot_six_ffts(npz_file_path):
     )
     fig.show()
 
-
 def plot_six_time_domain(npz_file_path):
     data = np.load(npz_file_path)
 
@@ -134,8 +144,7 @@ def plot_six_time_domain(npz_file_path):
     )
     fig.show()
 
-
-# Generate the interactive plots.
-plot_six_spectrograms(npz_file_path)
-plot_six_ffts(npz_file_path)
-plot_six_time_domain(npz_file_path)
+# Generate the interactive plots using the most recent NPZ file.
+plot_six_spectrograms(most_recent_npz)
+plot_six_ffts(most_recent_npz)
+plot_six_time_domain(most_recent_npz)
