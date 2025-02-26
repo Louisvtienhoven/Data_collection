@@ -69,6 +69,8 @@ bool removeOldFile = true;              // remove old file if commanded
 unsigned long g_sampleDurationMs = 0;
 unsigned long g_sampleDelayMs = 0;
 
+
+
 // Globals for timing and file usage
 mbed::File logFile;
 unsigned long startTime = 0;
@@ -322,7 +324,7 @@ void setup() {
   NDP.begin("mcu_fw_120_v91.synpkg");
   NDP.load("dsp_firmware_v91.synpkg");
   Serial.println("- NDP processor initialization done!");
-
+  
   // Sensor configuration sequence.
   {
     uint8_t __attribute__((aligned(4))) sensor_data[SENSOR_DATA_LENGTH];
@@ -393,7 +395,8 @@ void setup() {
     }
     writeMetadataToFile();
     Serial.println("Stored measurement command found.");
-    startTime = millis();
+    // Removed startTime assignment here so that timing starts in loop():
+    // startTime = millis();
     currentState = SAMPLING;
     Serial.println("Sampling started...");
   } else {
@@ -516,7 +519,8 @@ void loop() {
             while (true) {}
           }
           writeMetadataToFile();
-          startTime = millis();
+          // Removed startTime assignment here:
+          // startTime = millis();
           currentState = SAMPLING;
           Serial.println("Sampling started...");
         }
@@ -524,6 +528,11 @@ void loop() {
     }
   }
   else if (currentState == SAMPLING) {
+    // NEW: If this is the first pass in SAMPLING, initialize startTime now.
+    if (startTime == 0) {
+      startTime = millis();
+    }
+
     // Blink LED during sampling.
     unsigned long currentMillis = millis();
     if (currentMillis - previousBlinkTime >= blinkInterval) {
