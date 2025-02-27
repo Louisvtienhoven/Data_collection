@@ -1,5 +1,6 @@
 import numpy as np
-from scipy.signal import spectrogram
+import librosa
+import librosa.display
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import os
@@ -18,8 +19,16 @@ if not npz_files:
 most_recent_npz = max(npz_files, key=os.path.getmtime)
 print(f"Most recent NPZ file found: {most_recent_npz}")
 
+# Specify a manual NPZ file if desired; leave as None to use the most recent NPZ file.
+manual_npz = None  # e.g., r'C:\path\to\your\file.npz'
+
+# Use manual_npz if provided; otherwise, use the most recent NPZ file.
+file_to_use = manual_npz if manual_npz is not None else most_recent_npz
+print(f"Using NPZ file: {file_to_use}")
+
 fs = 25  # Sampling frequency (Hz)
 keys = ['ax', 'ay', 'az', 'gx', 'gy', 'gz']
+
 
 def plot_six_spectrograms(npz_file_path):
     data = np.load(npz_file_path)
@@ -29,20 +38,35 @@ def plot_six_spectrograms(npz_file_path):
                         subplot_titles=keys,
                         horizontal_spacing=0.08, vertical_spacing=0.1)
 
+    # Parameters for mel spectrogram.
+    n_fft = 2048
+    hop_length = 512
+    n_mels = 128
+
     row, col = 1, 1
     for i, key in enumerate(keys):
         signal = data[key]
-        f, t_spec, Sxx = spectrogram(signal, fs)
-        Sxx_db = 10 * np.log10(Sxx)
+
+        # Compute mel spectrogram using librosa.
+        S = librosa.feature.melspectrogram(y=signal, sr=fs,
+                                           n_fft=n_fft,
+                                           hop_length=hop_length,
+                                           n_mels=n_mels)
+        S_db = librosa.power_to_db(S, ref=np.max)
+
+        # Generate time vector for the spectrogram frames.
+        t_spec = librosa.frames_to_time(np.arange(S_db.shape[1]), sr=fs, hop_length=hop_length)
+        # Get the mel frequency bins.
+        mel_f = librosa.mel_frequencies(n_mels=S_db.shape[0], fmin=0, fmax=fs / 2)
 
         # Set color scale limits based on percentiles.
-        vmin = np.percentile(Sxx_db, 5)
-        vmax = np.percentile(Sxx_db, 95)
+        vmin = np.percentile(S_db, 5)
+        vmax = np.percentile(S_db, 95)
 
         heatmap = go.Heatmap(
-            z=Sxx_db,
+            z=S_db,
             x=t_spec,
-            y=f,
+            y=mel_f,
             colorscale='Jet',
             zmin=vmin,
             zmax=vmax,
@@ -58,11 +82,12 @@ def plot_six_spectrograms(npz_file_path):
             row += 1
 
     fig.update_layout(
-        title="Spectrograms for all 6 Sensor Channels (Plotly)",
+        title="Mel Spectrograms for all 6 Sensor Channels (Plotly)",
         height=800,
         width=1200
     )
     fig.show()
+
 
 def plot_six_ffts(npz_file_path):
     data = np.load(npz_file_path)
@@ -107,6 +132,7 @@ def plot_six_ffts(npz_file_path):
     )
     fig.show()
 
+
 def plot_six_time_domain(npz_file_path):
     data = np.load(npz_file_path)
 
@@ -144,7 +170,8 @@ def plot_six_time_domain(npz_file_path):
     )
     fig.show()
 
-# Generate the interactive plots using the most recent NPZ file.
-plot_six_spectrograms(most_recent_npz)
-plot_six_ffts(most_recent_npz)
-plot_six_time_domain(most_recent_npz)
+
+# Generate the interactive plots using the selected NPZ file.
+plot_six_spectrograms(file_to_use)
+plot_six_ffts(file_to_use)
+plot_six_time_domain(file_to_use)

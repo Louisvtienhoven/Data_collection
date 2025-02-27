@@ -16,6 +16,13 @@ if not csv_files:
 most_recent_file = max(csv_files, key=os.path.getmtime)
 print(f"Most recent CSV file found: {most_recent_file}")
 
+# Specify a manual file if desired; leave as None to use the most recent file.
+manual_file = None  # e.g., r'C:\path\to\your\file.csv'
+
+# Use manual_file if provided; otherwise, use the most recent CSV file.
+file_to_use = manual_file if manual_file is not None else most_recent_file
+print(f"Using CSV file: {file_to_use}")
+
 def read_sensor_data(file_path):
     data = []
     with open(file_path, 'r') as file:
@@ -41,7 +48,7 @@ def read_sensor_data(file_path):
     else:
         return np.array([])
 
-data_arrays = read_sensor_data(most_recent_file)
+data_arrays = read_sensor_data(file_to_use)
 if data_arrays.size:
     ax, ay, az, gx, gy, gz = data_arrays
 
@@ -54,7 +61,7 @@ if data_arrays.size:
     print("gz:", gz[:5])
 
     # Derive the output NPZ file name from the CSV file name.
-    base_name = os.path.splitext(os.path.basename(most_recent_file))[0]
+    base_name = os.path.splitext(os.path.basename(file_to_use))[0]
     npz_file_name = base_name + ".npz"
 
     # Set the output folder.

@@ -1,12 +1,12 @@
 import serial
 import time
-import os
+import osjF
 import sys
 from datetime import datetime
 import pytz  # for timezone conversion
 
 # USB Serial configuration (update port name as necessary)
-SERIAL_PORT = 'COM3'  # For Windows (e.g., "COM3"); use "/dev/ttyACM0" on Linux/macOS
+SERIAL_PORT = 'COM4'  # For Windows (e.g., "COM3"); use "/dev/ttyACM0" on Linux/macOS
 BAUD_RATE = 460800 #Default baud rate is 115200
 
 # Directory to save the collected data
