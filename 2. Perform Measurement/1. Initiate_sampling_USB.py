@@ -4,13 +4,13 @@ from datetime import datetime
 import pytz  # for timezone conversion
 
 # Measurement parameters
-frequency = 28  # Hz
-duration = 60  # in minutes
+frequency = 28  # Hz, in practice this should be about 1-2 Hz higher because of flashing the memory
+duration = 2  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 
 # Manually set the COM port and baud rate
 SERIAL_PORT = "COM3"  # Change this if needed
-BAUD_RATE = 115200 #Default is 115200
+BAUD_RATE = 460800    #Default is 115200
 
 
 

@@ -115,9 +115,13 @@ void writeToBuffer(float ax, float ay, float az,
 {
   unsigned long t = millis();
   char lineBuf[128];
+  // int n = snprintf(lineBuf, sizeof(lineBuf),
+  //                  "%lu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
+  //                  t, ax, ay, az, gx, gy, gz);
   int n = snprintf(lineBuf, sizeof(lineBuf),
-                   "%lu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
-                   t, ax, ay, az, gx, gy, gz);
+                 "%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
+                 ax, ay, az, gx, gy, gz);
+
   if (n > 0 && (bufferIndex + n) < BUFFER_SIZE) {
     memcpy(&dataBuffer[bufferIndex], lineBuf, n);
     bufferIndex += n;
@@ -289,6 +293,7 @@ void startupBlink() {
 // --------------------
 void setup() {
   Serial.begin(460800);
+  Serial.println("Baud rate set to 460800");
   delay(3000);
   Serial.println("\n--- Nicla Voice: BMI270 to SPI Flash Demo ---");
 
