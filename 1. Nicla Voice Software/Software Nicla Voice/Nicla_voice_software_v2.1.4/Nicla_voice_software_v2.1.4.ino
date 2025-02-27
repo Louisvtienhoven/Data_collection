@@ -288,7 +288,7 @@ void startupBlink() {
 // Setup: Initialize SPI Flash, LittleFS, Nicla, BMI270, etc.
 // --------------------
 void setup() {
-  Serial.begin(921600);
+  Serial.begin(460800);
   delay(3000);
   Serial.println("\n--- Nicla Voice: BMI270 to SPI Flash Demo ---");
 

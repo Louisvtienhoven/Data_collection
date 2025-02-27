@@ -7,7 +7,7 @@ import pytz  # for timezone conversion
 
 # USB Serial configuration (update port name as necessary)
 SERIAL_PORT = 'COM3'  # For Windows (e.g., "COM3"); use "/dev/ttyACM0" on Linux/macOS
-BAUD_RATE = 921600    # Default baud rate for the device is 115200
+BAUD_RATE = 115200 #Default is 115200
 
 # Directory to save the collected data
 SAVE_DIR = r"C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Data"
@@ -16,7 +16,7 @@ SAVE_DIR = r"C:\Users\Louis\MSc-Thesis-Louis\2. Perform Measurement\Collected Da
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # Clear memory
-clear_memory = False
+clear_memory = True
 
 
 def retrieve_csv():
