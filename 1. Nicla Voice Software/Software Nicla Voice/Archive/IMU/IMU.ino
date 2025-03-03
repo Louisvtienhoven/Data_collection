@@ -12,8 +12,8 @@
 #define GYRO_SCALE_FACTOR (1 / 16.4)
 
 #define SAMPLE_RATE 100  // Hz (100 samples per second)
-#define RECORD_DURATION 10  // Recording duration in seconds
-#define WAIT_DURATION 15  // Time to wait before sending file (seconds)
+#define RECORD_DURATION 5  // Recording duration in seconds
+#define WAIT_DURATION 1  // Time to wait before sending file (seconds)
 
 #define NUM_SAMPLES (SAMPLE_RATE * RECORD_DURATION) // Total samples to store
 
@@ -136,7 +136,8 @@ void loop() {
     dataFile.println(z_gyr);
     dataFile.flush();  // Ensure data is saved
 
-    delay(10);  // Ensures 100 Hz sampling rate
+   // delay(10);  // Ensures 100 Hz sampling rate
+    delayMicroseconds(625);
   }
 
   // Wait 15 seconds, then send file to computer

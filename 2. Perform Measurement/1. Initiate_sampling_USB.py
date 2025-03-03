@@ -9,7 +9,7 @@ duration = 210  # in minutes
 remove_flag = 1  # 0 = false, 1 = true
 
 # Manually set the COM port and baud rate
-SERIAL_PORT = "COM3"  # Change this if needed
+SERIAL_PORT = "COM4"  # Change this if needed
 BAUD_RATE = 460800    #Default is 115200
 
 
