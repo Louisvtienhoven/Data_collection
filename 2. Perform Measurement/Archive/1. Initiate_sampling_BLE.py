@@ -4,8 +4,8 @@ import pytz
 from bleak import BleakClient, BleakScanner
 
 # Measurement parameters
-frequency = 65      # Hz
-duration = 0.05     # in minutes
+frequency = 26      # Hz
+duration = 60     # in minutes
 remove_flag = 1     # 0 = false, 1 = true
 
 # BLE Variables

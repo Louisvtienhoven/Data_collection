@@ -6,7 +6,9 @@ from bleak import BleakClient, BleakScanner
 # Measurement parameters
 frequency = 65      # Hz
 duration = 0.05     # in minutes
-waiting_time = 0.2  # waiting time in minutes (new)
+waiting_time = 0.2  # waiting time in minutes before starting the measurement
+
+# Do not modify
 remove_flag = 1     # 0 = false, 1 = true
 
 # BLE Variables
@@ -20,6 +22,9 @@ DEVICE_NAME = "NiclaVoice1"  # Use either NiclaVoice1 or NiclaVoice2
 
 # UUID of the characteristic to write measurement parameters
 CHAR_UUID = "abcdef01-1234-5678-1234-56789abcdef0"  # Must match the Arduino UUID
+
+# Clear memory command, not advised to use
+remove_flag = 1     # 0 = false, 1 = true
 
 async def find_device():
     for scan_attempt in range(1, n_scan_retries + 1):
