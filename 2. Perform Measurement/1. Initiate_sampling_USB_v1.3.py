@@ -3,16 +3,27 @@ import time
 from datetime import datetime
 import pytz  # for timezone conversion
 
+# This script sends measurement parameters to an Arduino device over a serial connection.
+# The parameters include frequency, duration, additional delay, and whether to collect gyroscope data.
+
+
+#------------------------------
 # Measurement parameters
-frequency = 100  # Hz, in practice this should be about 1-2 Hz higher because of flashing the memory
-duration = 10  # in minutes
-remove_flag = 1  # 0 = false, 1 = true
+frequency = 100           # Hz
+duration = 1             # in minutes
+additional_delay = 2      # extra delay in minutes before sampling starts
+collect_gyro = 0          # set to 0 to collect only accelerometer data, 1 for both
 
 # Manually set the COM port and baud rate
-SERIAL_PORT = "COM3"  # Change this if needed
-BAUD_RATE = 460800    #Default is 115200
+SERIAL_PORT = "COM3"  # Change if needed
+BAUD_RATE = 460800    # Default is 115200
+
+#------------------------------
 
 
+
+# Clear memory command, not advised to use
+remove_flag = 1           # 0 = false, 1 = true
 
 def send_measurement_parameters():
     try:
@@ -39,9 +50,11 @@ def send_measurement_parameters():
     # Get the actual Unix timestamp in the Europe/Amsterdam timezone.
     tz = pytz.timezone("Europe/Amsterdam")
     real_world_time = int(datetime.now(tz).timestamp())
+    # Add additional_delay (converted to seconds) to the real world time.
+    adjusted_time = real_world_time + additional_delay * 60
 
-    # Format the command string (must match the Arduino format).
-    command = f"{frequency},{real_world_time},{duration},{remove_flag}\n"
+    # Format the command string with the six parameters.
+    command = f"{frequency},{adjusted_time},{duration},{remove_flag},{additional_delay},{collect_gyro}\n"
     print(f"Sending command: {command.strip()}")
 
     # Send the command over USB Serial.

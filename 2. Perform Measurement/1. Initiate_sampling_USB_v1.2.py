@@ -4,15 +4,14 @@ from datetime import datetime
 import pytz  # for timezone conversion
 
 # Measurement parameters
-frequency = 100  # Hz, in practice this should be about 1-2 Hz higher because of flashing the memory
-duration = 10  # in minutes
-remove_flag = 1  # 0 = false, 1 = true
+frequency = 100           # Hz, in practice this should be about 1-2 Hz higher because of flashing the memory
+duration = 1             # in minutes
+remove_flag = 1           # 0 = false, 1 = true
+additional_delay = 2      # extra delay in minutes to wait before sampling starts
 
 # Manually set the COM port and baud rate
 SERIAL_PORT = "COM3"  # Change this if needed
-BAUD_RATE = 460800    #Default is 115200
-
-
+BAUD_RATE = 460800    # Default is 115200
 
 def send_measurement_parameters():
     try:
@@ -39,9 +38,11 @@ def send_measurement_parameters():
     # Get the actual Unix timestamp in the Europe/Amsterdam timezone.
     tz = pytz.timezone("Europe/Amsterdam")
     real_world_time = int(datetime.now(tz).timestamp())
+    # Add additional_delay (converted to seconds) to the real world time.
+    adjusted_time = real_world_time + additional_delay * 60
 
-    # Format the command string (must match the Arduino format).
-    command = f"{frequency},{real_world_time},{duration},{remove_flag}\n"
+    # Format the command string with the extra delay as the 5th parameter.
+    command = f"{frequency},{adjusted_time},{duration},{remove_flag},{additional_delay}\n"
     print(f"Sending command: {command.strip()}")
 
     # Send the command over USB Serial.
