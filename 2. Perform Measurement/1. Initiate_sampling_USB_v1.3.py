@@ -8,8 +8,9 @@ import pytz  # for timezone conversion
 
 
 #------------------------------
+
 # Measurement parameters
-frequency = 100           # Hz
+frequency = 2000           # Hz
 duration = 1             # in minutes
 additional_delay = 2      # extra delay in minutes before sampling starts
 collect_gyro = 0          # set to 0 to collect only accelerometer data, 1 for both
@@ -17,6 +18,10 @@ collect_gyro = 0          # set to 0 to collect only accelerometer data, 1 for b
 # Manually set the COM port and baud rate
 SERIAL_PORT = "COM3"  # Change if needed
 BAUD_RATE = 460800    # Default is 115200
+
+#Please note! Because of integer division, when sampleFrequencyHz is greater than 1000, 1000 divided
+# by that value yields 0 (e.g., 1000/2000 equals 0). Thus, any sampling frequency above 1000 Hz
+# induces no additional delay.
 
 #------------------------------
 
