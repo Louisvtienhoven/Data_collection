@@ -6,29 +6,26 @@ import pytz  # for timezone conversion
 # This script sends measurement parameters to an Arduino device over a serial connection.
 # The parameters include frequency, duration, additional delay, and whether to collect gyroscope data.
 
-
 #------------------------------
 
 # Measurement parameters
 frequency = 2000           # Hz
-duration = 1             # in minutes
-additional_delay = 2      # extra delay in minutes before sampling starts
-collect_gyro = 0          # set to 0 to collect only accelerometer data, 1 for both
+duration = 1               # in minutes
+additional_delay = 2       # extra delay in minutes before sampling starts
+collect_gyro = 0           # set to 0 to collect only accelerometer data, 1 for both
 
 # Manually set the COM port and baud rate
-SERIAL_PORT = "COM4"  # Change if needed
-BAUD_RATE = 460800    # Default is 115200
+SERIAL_PORT = "COM4"       # Change if needed
+BAUD_RATE = 460800         # Default is 115200
 
-#Please note! Because of integer division, when sampleFrequencyHz is greater than 1000, 1000 divided
-# by that value yields 0 (e.g., 1000/2000 equals 0). Thus, any sampling frequency above 1000 Hz
-# induces no additional delay. The maximum sampling frequency here is rougly 240 Hz
+# Please note! Because of integer division, when sampleFrequencyHz is greater than 1000,
+# 1000 divided by that value yields 0 (e.g., 1000/2000 equals 0). Thus, any sampling frequency
+# above 1000 Hz induces no additional delay. The maximum sampling frequency here is roughly 240 Hz.
 
 #------------------------------
 
-
-
 # Clear memory command, not advised to use
-remove_flag = 1           # 0 = false, 1 = true
+remove_flag = 1            # 0 = false, 1 = true
 
 def send_measurement_parameters():
     try:
@@ -55,8 +52,8 @@ def send_measurement_parameters():
     # Get the actual Unix timestamp in the Europe/Amsterdam timezone.
     tz = pytz.timezone("Europe/Amsterdam")
     real_world_time = int(datetime.now(tz).timestamp())
-    # Add additional_delay (converted to seconds) to the real world time.
-    adjusted_time = real_world_time + additional_delay * 60
+    # Add additional_delay (converted to seconds) plus an extra 30 seconds for battery reconnection.
+    adjusted_time = real_world_time + additional_delay * 60 + 30
 
     # Format the command string with the six parameters.
     command = f"{frequency},{adjusted_time},{duration},{remove_flag},{additional_delay},{collect_gyro}\n"
