@@ -7,22 +7,22 @@ import pytz  # for timezone conversion
 
 # USB Serial configuration (update port name as necessary)
 SERIAL_PORT = 'COM3'  # For Windows (e.g., "COM3"); use "/dev/ttyACM0" on Linux/macOS
-BAUD_RATE = 115200 #Default is 115200
+BAUD_RATE = 460800 #Default baud rate is 115200
 
 # Directory to save the collected data
-SAVE_DIR = r"/2. Perform Measurement/Collected Data"
+SAVE_DIR = r"/2. Sensor Measurement/Collected Data"
 
 # Ensure the directory exists
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-# Clear memory
+# Flag to determine whether to clear device memory after retrieval
 clear_memory = True
 
 
 def retrieve_csv():
     try:
-        # Use a shorter timeout in the loop, but keep an overall generous timeout for connection.
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+        # Open serial port with additional flow control settings.
+        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1, rtscts=True, xonxoff=True)
     except serial.SerialException as e:
         print("Error: Serial connection could not be established:", e)
         return None, None
@@ -40,35 +40,54 @@ def retrieve_csv():
 
     # Send the GETCSV command.
     ser.write(b'GETCSV\n')
+    print("Sent GETCSV command to device.")
 
-    # Continuously read data until no new data is received for timeout_period seconds.
-    csv_data = ""
-    timeout_period = 2.0  # seconds to wait after the last received data
-    last_data_time = time.time()
+    # Write incoming data directly to a temporary file.
+    temp_filename = "temp_csv_data.txt"
+    with open(temp_filename, "w", encoding="utf-8") as temp_file:
+        timeout_period = 2.0  # seconds to wait after the last received data
+        last_data_time = time.time()
+        total_bytes = 0
+        while True:
+            if ser.in_waiting:
+                try:
+                    # Read all available bytes and decode them.
+                    new_data = ser.read(ser.in_waiting).decode('utf-8', errors='replace')
+                except Exception as e:
+                    print("Decoding error:", e)
+                    new_data = ""
+                if new_data:
+                    temp_file.write(new_data)
+                    total_bytes += len(new_data)
+                    last_data_time = time.time()  # Reset timer when new data arrives.
+                    print(f"Received {len(new_data)} bytes, total {total_bytes} bytes")
+            # End loop if no new data arrives within the timeout period.
+            if time.time() - last_data_time > timeout_period:
+                print(f"No new data received for {timeout_period} seconds. Ending read.")
+                break
+            time.sleep(0.1)
 
-    while True:
-        if ser.in_waiting:
-            # Read all bytes available
-            new_data = ser.read(ser.in_waiting).decode('utf-8', errors='replace')
-            csv_data += new_data
-            last_data_time = time.time()  # reset timer when new data arrives
-        # Check if no new data has arrived for timeout_period seconds
-        if time.time() - last_data_time > timeout_period:
-            break
-        time.sleep(0.1)  # Small delay to prevent busy-waiting
-
-    # Now send the CLRFLAG command to clear done.txt.
-
-    if clear_memory == True:
+    # Optionally, send CLRFLAG command to clear the device's memory.
+    if clear_memory:
         ser.write(b'CLRFLAG\n')
-        time.sleep(0.5)  # Wait for the device to process the command.
+        print("Sent CLRFLAG command to device.")
+        time.sleep(0.5)  # Allow time for the device to process the command.
 
+    # Read any flag response.
     flag_response = ""
     while ser.in_waiting:
         flag_response += ser.read(ser.in_waiting).decode('utf-8', errors='replace')
         time.sleep(0.1)
 
     ser.close()
+    print("Serial port closed.")
+
+    # Read the entire content of the temporary file.
+    with open(temp_filename, "r", encoding="utf-8") as temp_file:
+        csv_data = temp_file.read()
+    # Clean up temporary file.
+    os.remove(temp_filename)
+
     return csv_data, flag_response
 
 
@@ -83,7 +102,7 @@ def parse_parameters(csv_data):
     frequency_param = None
     duration_param = None
     time_param = None
-    # Split into individual lines
+    # Split CSV content into individual lines.
     lines = csv_data.splitlines()
     for line in lines:
         if "Sampling Frequency" in line:
@@ -109,10 +128,10 @@ if __name__ == '__main__':
         print("CSV retrieval failed due to serial connection issues.")
         sys.exit(1)
     else:
-        print("Retrieved CSV Data:")
-        print(csv_content)
+        print("Retrieved CSV Data (first 500 characters):")
+        print(csv_content[:500])
 
-        # Try to parse the measurement parameters from the CSV header.
+        # Parse measurement parameters from the CSV header.
         freq_par, dur_par, time_par = parse_parameters(csv_content)
         if not (freq_par and dur_par and time_par):
             print("Error: CSV header does not contain all required measurement parameters.")
@@ -121,7 +140,6 @@ if __name__ == '__main__':
         # Replace spaces and colons in the time string for filename safety.
         safe_time = time_par.replace(" ", "_").replace(":", "-")
         filename = f"{freq_par}Hz_{dur_par}min_{safe_time}.csv"
-
         file_path = os.path.join(SAVE_DIR, filename)
 
         with open(file_path, "w", encoding="utf-8") as f:

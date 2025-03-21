@@ -10,17 +10,18 @@ import pytz  # for timezone conversion
 
 # Measurement parameters
 frequency = 1600           # Hz
-duration = 15               # in minutes
-additional_delay = 5       # extra delay in minutes before sampling starts
+duration = 45               # in minutes
+additional_delay = 10       # extra delay in minutes before sampling starts
 collect_gyro = 0           # set to 0 to collect only accelerometer data, 1 for both
 
 # Manually set the COM port and baud rate
-SERIAL_PORT = "COM3"       # Change if needed
+SERIAL_PORT = "COM4"       # Change if needed
 BAUD_RATE = 460800         # Default is 115200
 
 # Please note! Because of integer division, when sampleFrequencyHz is greater than 1000,
 # 1000 divided by that value yields 0 (e.g., 1000/2000 equals 0). Thus, any sampling frequency
 # above 1000 Hz induces no additional delay. The maximum sampling frequency here is roughly 240 Hz.
+# Bottleneck is likely the SPI communication rate.
 
 #------------------------------
 

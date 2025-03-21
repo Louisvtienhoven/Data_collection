@@ -269,7 +269,7 @@ def update_dashboard(file_name):
 
 
 # Set the directory to look for CSV files
-data_dir = r"/2. Perform Measurement/Collected Data"
+data_dir = r"/2. Sensor Measurement/Collected Data"
 csv_files = sorted([os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.lower().endswith('.csv')])
 if not csv_files:
     csv_files = [
@@ -281,7 +281,7 @@ dashboard_panel = pn.bind(update_dashboard, file_name=file_selector)
 header = pn.Row(
     pn.pane.PNG('ESA_LOGO.png', width=200),
     pn.pane.Markdown(
-        "# ESA Analyzer Dashboard",
+        "# ESA Analyzer Dashboard Sensor Data",
         align='center',
         styles={
             'margin-top': '30px',
@@ -308,7 +308,7 @@ layout = pn.Column(
 )
 
 template = pn.template.MaterialTemplate(
-    title="ESA Analyzer Dashboard",
+    title="ESA Analyzer Dashboard Sensor Data",
     header_background=colors['deep space'],
     main=[layout]
 )
